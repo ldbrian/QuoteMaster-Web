@@ -54,7 +54,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
       // 4. 🚀 触发后端 AI 分析 (Fire and Forget)
       // 注意：这里我们只管触发，不等待 AI 返回结果，以免前端卡顿
       try {
-        await fetch('http://127.0.0.1:8000/api/analyze', {
+        await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
