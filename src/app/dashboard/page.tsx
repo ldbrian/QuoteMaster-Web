@@ -158,8 +158,10 @@ export default function Dashboard() {
       />
       <QuoteDetailPanel 
         isOpen={!!selectedInquiryId} 
-        inquiryId={selectedInquiryId} 
         onClose={() => setSelectedInquiryId(null)} 
+        // 关键在这一行！把查询到的完整对象传给子组件
+        // 注意：如果你的列表变量不叫 inquiries（比如叫 data 或 quotes），请把前面的 inquiries 换成你的变量名
+        quoteData={leads?.find((item: any) => item.id === selectedInquiryId) || null} 
       />
     </div>
   );
