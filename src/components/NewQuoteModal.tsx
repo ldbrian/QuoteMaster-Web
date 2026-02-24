@@ -53,20 +53,25 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
 
       // 4. 🚀 触发后端 AI 分析 (Fire and Forget)
       // 注意：这里我们只管触发，不等待 AI 返回结果，以免前端卡顿
+      const formData = new FormData();
+formData.append("file", file); // 直接把文件对象塞进去，不要转base64！
+formData.append("user_prompt", note);
       try {
-        await fetch('https://api.toughlove.online/api/get_quote', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            inquiry_id: newInquiry.id,
-            image_url: publicUrl,
-            user_note: note
-          })
-        });
-      } catch (err) {
-        console.error('Failed to trigger AI backend:', err);
-        // 这里不 throw error，因为数据已经存库了，不算完全失败
-      }
+  const response = await fetch("https://api.toughlove.online/api/get_quote", {
+    method: "POST",
+    // ⚠️ 极其关键：这里千万不要手动设置 {"Content-Type": "multipart/form-data"}！
+    // 浏览器会自动帮你设置正确的 Content-Type 和 Boundary 边界！
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  const result = await response.json();
+  console.log("🎉 终于成功了:", result);
+} catch (error) {
+  console.error("❌ 报错:", error);
+}
 
       // 5. 成功回调
       onSuccess();
