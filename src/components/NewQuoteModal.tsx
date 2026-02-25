@@ -2,12 +2,12 @@
 
 import React, { useState } from 'react';
 import { X, Upload, Loader2, FileImage } from 'lucide-react';
-import { supabase } from '@/src/utils/supabase/client'; // 使用您修正后的路径
+import { supabase } from '@/src/utils/supabase/client'; 
 
 interface NewQuoteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void; // 上传成功后回调
+  onSuccess: () => void;
 }
 
 export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteModalProps) {
@@ -26,7 +26,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('inquiry-images') // 确保这里是你创建的 Bucket 名字
+        .from('inquiry-images')
         .upload(fileName, file);
 
       if (uploadError) throw uploadError;
@@ -36,7 +36,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
         .from('inquiry-images')
         .getPublicUrl(fileName);
 
-      // 3. 在数据库创建新询盘，并立即拿回 ID
+      // 3. 在数据库创建新询盘，状态设为 analyzing
       const { data: newInquiry, error: dbError } = await supabase
         .from('inquiries')
         .insert({
@@ -44,36 +44,55 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
           source: 'Dashboard Upload',
           status: 'analyzing',
           thumbnail_url: publicUrl,
-          // 如果你的数据库有 note 字段，可以在这里加：note: note
         })
-        .select() // 👈 关键：加上这个才能返回数据
-        .single(); // 👈 关键：只返回一条
+        .select()
+        .single();
 
       if (dbError) throw dbError;
 
-      // 4. 🚀 触发后端 AI 分析 (Fire and Forget)
-      // 注意：这里我们只管触发，不等待 AI 返回结果，以免前端卡顿
+      // 4. 发送给后端大模型计算
       const formData = new FormData();
-formData.append("file", file); // 直接把文件对象塞进去，不要转base64！
-formData.append("user_prompt", note);
-      try {
-  const response = await fetch("https://api.toughlove.online/api/get_quote", {
-    method: "POST",
-    // ⚠️ 极其关键：这里千万不要手动设置 {"Content-Type": "multipart/form-data"}！
-    // 浏览器会自动帮你设置正确的 Content-Type 和 Boundary 边界！
-    body: formData,
-  });
+      formData.append("file", file);
+      formData.append("user_prompt", note);
+      
+      const response = await fetch("https://api.toughlove.online/api/get_quote", {
+        method: "POST",
+        body: formData,
+      });
 
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-  const result = await response.json();
-  console.log("🎉 终于成功了:", result);
-} catch (error) {
-  console.error("❌ 报错:", error);
-}
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log("🎉 AI 估价成功返回:", result);
 
-      // 5. 成功回调
+      // 5. 🚀 关键修复：把 AI 的结果更新到 Supabase 数据库！
+      if (result && !result.error) {
+        // 5.1 更新主订单状态（解除 analyzing 状态，更新真实价格）
+        await supabase
+          .from('inquiries')
+          .update({
+            status: 'quoted', // 状态改为已报价
+            product_name: result.product_name || 'AI Quoted Item',
+            estimated_value: result.final_price || result.total_cost || 0,
+          })
+          .eq('id', newInquiry.id);
+
+        // 5.2 把详细的 BOM 表和分析理由存入 messages 表（供详情页展示）
+        const aiReply = `根据您的图片分析：\n\n【成本估算】\n${result.analysis_reasoning}\n\n最终FOB报价: $${result.final_price}`;
+        await supabase.from('messages').insert({
+          inquiry_id: newInquiry.id,
+          role: 'assistant',
+          content: aiReply,
+          quote_data: result // 把整个 json 存进去
+        });
+      } else {
+        // 如果后端报错，把状态改为 failed
+        await supabase.from('inquiries').update({ status: 'failed' }).eq('id', newInquiry.id);
+      }
+
+      // 6. 成功回调，关闭弹窗，刷新主界面
       onSuccess();
       onClose();
       setFile(null);
@@ -81,9 +100,9 @@ formData.append("user_prompt", note);
       
     } catch (error: any) {
       console.error('Full error:', error);
-      alert('Upload failed: ' + (error.message || 'Unknown error'));
+      alert('Upload or analysis failed: ' + (error.message || 'Unknown error'));
     } finally {
-      setUploading(false);
+      setUploading(false); // 永远别忘了关掉转圈圈
     }
   };
 
