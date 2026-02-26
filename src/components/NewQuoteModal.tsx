@@ -65,15 +65,20 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
         });
       } catch (firstError) {
         // 🚨 触发僵尸连接拦截！
-        console.warn("⚠️ 检测到休眠断联，正在自动建立新连接重试...", firstError);
-        // 毫不犹豫地进行第二次“全新拨号”
-        response = await fetch("https://api.toughlove.online/api/get_quote", {
+        console.warn("⚠️ 检测到休眠断联，正在清理底层 Socket...");
+        
+        // 🌟 破壁魔法 1：强制让代码睡 0.5 秒，等浏览器清理死连接
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        console.warn("🔄 发起强制新连接重试...");
+        // 🌟 破壁魔法 2：在网址末尾加上 ?t=时间戳，逼迫浏览器拉一根全新的物理网线！
+        response = await fetch(`https://api.toughlove.online/api/get_quote?t=${Date.now()}`, {
           method: "POST",
           body: formData,
         });
       }
 
-      // 如果重试了还是不行，或者后端返回了 500 等错误码
+      // 检查后端是否返回了 500 等错误码
       if (!response || !response.ok) {
         throw new Error(`HTTP error! status: ${response?.status}`);
       }
