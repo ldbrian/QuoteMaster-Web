@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/src/utils/supabase/client'; 
-import NewQuoteModal from '@/src/components/NewQuoteModal'; // 🔴 修复1：引入弹窗组件
+import NewQuoteModal from '@/src/components/NewQuoteModal'; 
 import QuoteDetailPanel from '@/src/components/QuoteDetailPanel';
 import { 
   Search, Bell, Plus, MoreVertical, 
@@ -21,10 +21,13 @@ const statusMap: any = {
 export default function Dashboard() {
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false); // 🔴 修复2：定义弹窗开关状态
+  const [isModalOpen, setIsModalOpen] = useState(false); 
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
+  
+  // 🌟 核心新增：专门用来存放“合并后”的详细数据，传给抽屉
+  const [detailData, setDetailData] = useState<any>(null); 
 
-  // 数据拉取函数 (提取出来，方便刷新用)
+  // 数据拉取函数 (主列表只拉取轻量数据)
   const fetchLeads = async () => {
     setLoading(true);
     try {
@@ -42,10 +45,39 @@ export default function Dashboard() {
     }
   };
 
-  // 首次加载
   useEffect(() => {
     fetchLeads();
   }, []);
+
+  // 🌟 核心新增：点击行的处理函数。先展示框架，再去捞取详细的 JSON
+  const handleOpenDetail = async (lead: any) => {
+    // 1. 瞬间打开抽屉，先把基础名字和总价传进去
+    setSelectedInquiryId(lead.id);
+    setDetailData(lead); 
+
+    try {
+      // 2. 悄悄去 messages 表里，把属于这个询盘的详细 AI 算价 JSON 捞出来
+      const { data, error } = await supabase
+        .from('messages')
+        .select('quote_data')
+        .eq('inquiry_id', lead.id)
+        .not('quote_data', 'is', null) // 确保里面有 json
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      // 3. 如果捞到了，就把主表数据和详细 JSON 完美融合，再次喂给抽屉！
+      if (data && data.length > 0 && data[0].quote_data) {
+        setDetailData({
+          ...lead,               // 原本的商品名等
+          ...data[0].quote_data  // BOM数组、分析理由、最终报价等
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch quote details:', err);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] font-sans text-slate-900 selection:bg-blue-100 relative">
@@ -86,7 +118,6 @@ export default function Dashboard() {
               <p className="text-slate-500 text-sm mt-1">Real-time data from Supabase.</p>
             </div>
             
-            {/* 🔴 修复3：绑定点击事件 onClick={() => setIsModalOpen(true)} */}
             <button 
               onClick={() => setIsModalOpen(true)}
               className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium text-sm shadow-lg shadow-blue-200 flex items-center gap-2 hover:bg-blue-700 cursor-pointer active:scale-95 transition-all"
@@ -135,8 +166,8 @@ export default function Dashboard() {
                         region={lead.region} 
                         status={lead.status} 
                         price={lead.estimated_value ? `$${lead.estimated_value}` : '--'} 
-                        // 🔴 修改：传入点击事件，点击时设置 ID
-                        onClick={() => setSelectedInquiryId(lead.id)}
+                        // 🌟 修改：调用新的点击处理函数
+                        onClick={() => handleOpenDetail(lead)}
                       />
                     ))}
                   </tbody>
@@ -147,21 +178,23 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* 🔴 修复4：将弹窗组件渲染在布局的最外层 */}
       <NewQuoteModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         onSuccess={() => {
           setIsModalOpen(false);
-          fetchLeads(); // 上传成功后刷新列表
+          fetchLeads(); 
         }} 
       />
+      
+      {/* 🌟 核心修改：把新组合好的 detailData 喂给抽屉 */}
       <QuoteDetailPanel 
         isOpen={!!selectedInquiryId} 
-        onClose={() => setSelectedInquiryId(null)} 
-        // 关键在这一行！把查询到的完整对象传给子组件
-        // 注意：如果你的列表变量不叫 inquiries（比如叫 data 或 quotes），请把前面的 inquiries 换成你的变量名
-        quoteData={leads?.find((item: any) => item.id === selectedInquiryId) || null} 
+        onClose={() => {
+          setSelectedInquiryId(null);
+          setDetailData(null); // 关闭时清空旧数据
+        }} 
+        quoteData={detailData} 
       />
     </div>
   );
