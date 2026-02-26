@@ -69,32 +69,28 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
           body: freshFormData,
         });
       };
-      
+
       let response;
       let result;
 
       try {
-        // 第一次尝试拨号
-        response = await fetch("https://api.toughlove.online/api/get_quote", {
-          method: "POST",
-          body: formData,
-        });
+        // 第一次正常发车
+        response = await sendRequest(false);
       } catch (firstError) {
-        // 🚨 触发僵尸连接拦截！
-        console.warn("⚠️ 检测到休眠断联，正在清理底层 Socket...");
+        console.warn("⚠️ 触雷！遇到僵尸连接，准备执行清场协议...", firstError);
         
-        // 🌟 破壁魔法 1：强制让代码睡 0.5 秒，等浏览器清理死连接
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // 🌟 破壁魔法 1：扔一个极轻的 GET 请求出去当“扫雷兵”，把连接池里的坏网线消耗掉
+        try { await fetch("https://api.toughlove.online/", { method: "GET" }); } catch (e) {}
         
-        console.warn("🔄 发起强制新连接重试...");
-        // 🌟 破壁魔法 2：在网址末尾加上 ?t=时间戳，逼迫浏览器拉一根全新的物理网线！
-        response = await fetch(`https://api.toughlove.online/api/get_quote?t=${Date.now()}`, {
-          method: "POST",
-          body: formData,
-        });
+        // 🌟 破壁魔法 2：强制代码休眠 1 秒钟，给浏览器内核时间把底层垃圾彻底倒掉
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        console.warn("🔄 垃圾清理完毕，发起全新重连！");
+        // 🌟 破壁魔法 3：重新打包文件，加上时间戳，强制使用新网线！
+        response = await sendRequest(true);
       }
 
-      // 检查后端是否返回了 500 等错误码
+      // 如果连扫雷重试都失败了，抛出真实错误
       if (!response || !response.ok) {
         throw new Error(`HTTP error! status: ${response?.status}`);
       }
