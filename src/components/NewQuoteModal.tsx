@@ -54,6 +54,22 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
       const formData = new FormData();
       formData.append("file", file);
       formData.append("user_prompt", note);
+
+      const sendRequest = async (isRetry = false) => {
+        const freshFormData = new FormData();
+        freshFormData.append("file", file);
+        freshFormData.append("user_prompt", note);
+        
+        const url = isRetry 
+          ? `https://api.toughlove.online/api/get_quote?t=${Date.now()}` 
+          : "https://api.toughlove.online/api/get_quote";
+
+        return await fetch(url, {
+          method: "POST",
+          body: freshFormData,
+        });
+      };
+      
       let response;
       let result;
 
