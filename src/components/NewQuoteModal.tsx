@@ -54,17 +54,31 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
       const formData = new FormData();
       formData.append("file", file);
       formData.append("user_prompt", note);
-      
-      const response = await fetch("https://api.toughlove.online/api/get_quote", {
-        method: "POST",
-        body: formData,
-      });
+      let response;
+      let result;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      try {
+        // 第一次尝试拨号
+        response = await fetch("https://api.toughlove.online/api/get_quote", {
+          method: "POST",
+          body: formData,
+        });
+      } catch (firstError) {
+        // 🚨 触发僵尸连接拦截！
+        console.warn("⚠️ 检测到休眠断联，正在自动建立新连接重试...", firstError);
+        // 毫不犹豫地进行第二次“全新拨号”
+        response = await fetch("https://api.toughlove.online/api/get_quote", {
+          method: "POST",
+          body: formData,
+        });
+      }
+
+      // 如果重试了还是不行，或者后端返回了 500 等错误码
+      if (!response || !response.ok) {
+        throw new Error(`HTTP error! status: ${response?.status}`);
       }
       
-      const result = await response.json();
+      result = await response.json();
       console.log("🎉 AI 估价成功返回:", result);
 
       // 5. 🚀 关键修复：把 AI 的结果更新到 Supabase 数据库！
