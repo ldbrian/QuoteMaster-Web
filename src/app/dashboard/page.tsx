@@ -121,16 +121,36 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-[#F8FAFC] font-sans text-slate-900 selection:bg-blue-100 relative">
       
-      {/* 左侧导航 - 🌟 加入了 disabled 视觉锁定效果 */}
-      <aside className="w-20 bg-white border-r border-slate-200 flex flex-col items-center py-6 gap-6 z-20">
-        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-200 mb-2">Q</div>
-        <nav className="flex flex-col gap-4 w-full px-3">
-          <NavItem icon={<LayoutGrid size={20} />} active />
-          <div onClick={handleComingSoon}><NavItem icon={<FileText size={20} />} disabled /></div>
-          <div onClick={handleComingSoon}><NavItem icon={<Users size={20} />} disabled /></div>
-          <div onClick={handleComingSoon}><NavItem icon={<BarChart2 size={20} />} disabled /></div>
+      {/* 左侧导航 - 🌟 升级为宽屏版，加入功能剧透和小角标 */}
+      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col py-6 gap-6 z-20 shrink-0">
+        
+        {/* Logo 和 产品名 */}
+        <div className="flex items-center gap-3 px-6 mb-2">
+          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-200">Q</div>
+          <span className="font-bold text-lg text-slate-800 tracking-tight">QuoteMaster</span>
+        </div>
+
+        <nav className="flex flex-col gap-2 w-full px-4">
+          <NavItem icon={<LayoutGrid size={20} />} label="AI Dashboard" active />
+          
+          <div className="mt-4 mb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            Workspace (Coming Soon)
+          </div>
+          
+          <div onClick={handleComingSoon}>
+            <NavItem icon={<FileText size={20} />} label="Quote History" disabled badge="PRO" />
+          </div>
+          <div onClick={handleComingSoon}>
+            <NavItem icon={<Users size={20} />} label="Client CRM" disabled />
+          </div>
+          <div onClick={handleComingSoon}>
+            <NavItem icon={<BarChart2 size={20} />} label="Cost Analytics" disabled />
+          </div>
         </nav>
-        <div className="mt-auto pb-4" onClick={handleComingSoon}><NavItem icon={<Settings size={20} />} disabled /></div>
+
+        <div className="mt-auto pb-4 px-4" onClick={handleComingSoon}>
+          <NavItem icon={<Settings size={20} />} label="Team Settings" disabled />
+        </div>
       </aside>
 
       {/* 主内容区 */}
@@ -272,13 +292,22 @@ export default function Dashboard() {
 }
 
 // === 🌟 修改：Navitem 支持 disabled 变灰样式 ===
-function NavItem({ icon, active, disabled }: { icon: React.ReactNode, active?: boolean, disabled?: boolean }) {
+function NavItem({ icon, label, active, disabled, badge }: { icon: React.ReactNode, label?: string, active?: boolean, disabled?: boolean, badge?: string }) {
   return (
-    <div className={`flex items-center justify-center w-full h-10 rounded-lg transition-all 
-      ${active ? 'bg-blue-50 text-blue-600' : 'text-slate-400'}
-      ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-50 hover:text-slate-600 cursor-pointer'}
+    <div className={`flex items-center justify-between w-full px-4 h-11 rounded-lg transition-all 
+      ${active ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-500 font-medium'}
+      ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50 hover:text-slate-700 cursor-pointer'}
     `}>
-      {icon}
+      <div className="flex items-center gap-3">
+        {icon}
+        <span className="text-sm">{label}</span>
+      </div>
+      {/* 诱人的小角标 */}
+      {badge && (
+        <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 tracking-wide shadow-sm">
+          {badge}
+        </span>
+      )}
     </div>
   );
 }
