@@ -258,7 +258,7 @@ export default function Dashboard() {
       <button
         onClick={() => {
           // 这里可以填你的微信号、邮箱，或者换成 window.open('腾讯问卷链接')
-          alert("💡 欢迎吐槽！\n\n遇到 Bug 了？觉得 AI 算得不准？想加新功能？\n\n请直接联系创始人微信：[请填入你的微信号]\n或发送邮件至：[请填入你的邮箱]\n\n老板，用得不爽直接喷我，您的每一个建议都是我们迭代的动力！");
+          alert("💡 欢迎吐槽！\n\n遇到 Bug 了？觉得 AI 算得不准？想加新功能？\n\n请直接联系创始人微信：[ldbrian]\n或发送邮件至：[ldbrian@163.com]\n\n老板，用得不爽直接喷我，您的每一个建议都是我们迭代的动力！");
         }}
         className="fixed bottom-8 right-8 bg-blue-600 text-white p-4 rounded-full shadow-2xl shadow-blue-300 hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all z-50 flex items-center justify-center group"
       >
