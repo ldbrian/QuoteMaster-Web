@@ -240,7 +240,12 @@ Best regards,
             </div>
           </div>
           
-          <button className="w-full mt-6 bg-gray-900 text-white font-medium py-3 rounded-lg hover:bg-gray-800 transition shadow-md flex justify-center items-center gap-2">
+          <button 
+            onClick={() => {
+              alert("🚧 【新功能内测中】\n\n一键生成带公司 Logo 的精美 PDF 报价单功能正在紧张开发中！\n\n如果您需要此功能，请通过页面右下角的【吐槽反馈】告诉我们，我们会为您优先排期上线！");
+            }}
+            className="w-full mt-6 bg-gray-900 text-white font-medium py-3 rounded-lg hover:bg-gray-800 transition shadow-md flex justify-center items-center gap-2"
+          >
             确认并生成正式报价单
           </button>
         </div>
