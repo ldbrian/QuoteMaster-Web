@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/src/utils/supabase/client'; 
-import { useRouter } from 'next/navigation'; // 🌟 引入路由钩子
+import { useRouter } from 'next/navigation'; 
 import NewQuoteModal from '@/src/components/NewQuoteModal'; 
 import QuoteDetailPanel from '@/src/components/QuoteDetailPanel';
 import { 
-  Search, Bell, Plus, MoreVertical, LogOut, // 🌟 新增 LogOut 图标
+  Search, Bell, Plus, MoreVertical, LogOut,
   LayoutGrid, FileText, Users, MessageSquare, 
   BarChart2, Settings, Globe, Loader2
 } from 'lucide-react';
@@ -25,20 +25,16 @@ export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false); 
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<any>(null); 
-  
-  // 🌟 新增：存放当前登录用户的信息
   const [user, setUser] = useState<any>(null);
   const router = useRouter();
 
-  // 🌟 核心新增：身份核验保安系统
+  // 身份核验
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        // 没登录？直接一脚踢到大门外
         router.push('/login');
       } else {
-        // 登录了，记录下身份，然后去干活拉数据
         setUser(session.user);
         fetchLeads();
       }
@@ -46,7 +42,7 @@ export default function Dashboard() {
     checkAuth();
   }, [router]);
 
-  // 数据拉取函数 
+  // 拉取真实数据
   const fetchLeads = async () => {
     setLoading(true);
     try {
@@ -63,6 +59,19 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
+  // 🌟 核心新增：动态计算真实的 KPI 数据
+  const kpiData = useMemo(() => {
+    // 1. 计算总预估价值 (只累加有价值的数字)
+    const totalValue = leads.reduce((sum, lead) => sum + (Number(lead.estimated_value) || 0), 0);
+    // 格式化为美金货币格式
+    const formattedTotal = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalValue);
+    
+    // 2. 计算仍在等待/分析中的数量
+    const pendingCount = leads.filter(lead => lead.status === 'analyzing' || lead.status === 'pending').length;
+
+    return { formattedTotal, pendingCount };
+  }, [leads]);
 
   // 点击行的处理函数
   const handleOpenDetail = async (lead: any) => {
@@ -91,18 +100,15 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 新增：敬请期待提示函数 (优雅阻挡非MVP功能)
   const handleComingSoon = () => {
     alert("🚧 功能正在紧张开发中，MVP 试用阶段敬请期待！");
   };
 
-  // 🌟 新增：退出登录功能
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
   };
 
-  // 🌟 防闪烁：如果还没验证完身份，显示全屏加载中
   if (!user) {
     return (
       <div className="h-screen bg-[#F8FAFC] flex flex-col items-center justify-center gap-3">
@@ -115,33 +121,31 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-[#F8FAFC] font-sans text-slate-900 selection:bg-blue-100 relative">
       
-      {/* 左侧导航 - 🌟 拦截非MVP功能 */}
+      {/* 左侧导航 - 🌟 加入了 disabled 视觉锁定效果 */}
       <aside className="w-20 bg-white border-r border-slate-200 flex flex-col items-center py-6 gap-6 z-20">
         <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-200 mb-2">Q</div>
         <nav className="flex flex-col gap-4 w-full px-3">
           <NavItem icon={<LayoutGrid size={20} />} active />
-          <div onClick={handleComingSoon}><NavItem icon={<FileText size={20} />} /></div>
-          <div onClick={handleComingSoon}><NavItem icon={<Users size={20} />} /></div>
-          <div onClick={handleComingSoon}><NavItem icon={<BarChart2 size={20} />} /></div>
+          <div onClick={handleComingSoon}><NavItem icon={<FileText size={20} />} disabled /></div>
+          <div onClick={handleComingSoon}><NavItem icon={<Users size={20} />} disabled /></div>
+          <div onClick={handleComingSoon}><NavItem icon={<BarChart2 size={20} />} disabled /></div>
         </nav>
-        <div className="mt-auto pb-4" onClick={handleComingSoon}><NavItem icon={<Settings size={20} />} /></div>
+        <div className="mt-auto pb-4" onClick={handleComingSoon}><NavItem icon={<Settings size={20} />} disabled /></div>
       </aside>
 
       {/* 主内容区 */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
         <header className="h-16 px-8 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10 border-b border-transparent">
-          {/* 🌟 拦截搜索功能 */}
           <div className="relative w-96 group" onClick={handleComingSoon}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input readOnly type="text" placeholder="Search leads (Coming soon)..." className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm cursor-not-allowed focus:outline-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 opacity-50" size={16} />
+            <input readOnly type="text" placeholder="Search leads (Coming soon)..." className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm cursor-not-allowed opacity-60 focus:outline-none" />
           </div>
           
           <div className="flex items-center gap-6">
-            <button onClick={handleComingSoon} className="relative p-2 text-slate-400 hover:bg-slate-100 rounded-full"><Bell size={18} /></button>
+            <button onClick={handleComingSoon} className="relative p-2 text-slate-400 hover:bg-slate-100 rounded-full opacity-50 cursor-not-allowed"><Bell size={18} /></button>
             <div className="h-8 w-[1px] bg-slate-200"></div>
             
-            {/* 🌟 显示真实用户标识与退出按钮 */}
             <div className="flex items-center gap-4">
               <div className="text-right hidden md:block">
                 <p className="text-sm font-bold text-slate-700 leading-none">
@@ -175,11 +179,11 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* 指标卡片 - 暂时写死，后续可加动态计算 */}
+          {/* 🌟 动态指标卡片 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <StatCard label="Total Inquiries" value={leads.length} trend="Live" trendUp={true} />
-            <StatCard label="Est. Value" value="$45,200" trend="+12%" trendUp={true} />
-            <StatCard label="Pending" value="3" trend="Action Needed" trendUp={false} />
+            <StatCard label="Total Inquiries" value={leads.length} trend="Real-time" trendUp={true} />
+            <StatCard label="Est. FOB Value" value={kpiData.formattedTotal} trend="Computed" trendUp={true} />
+            <StatCard label="Pending Analysis" value={kpiData.pendingCount} trend={kpiData.pendingCount > 0 ? "Action Needed" : "All Clear"} trendUp={kpiData.pendingCount === 0} />
           </div>
 
           {/* 表格区域 */}
@@ -255,10 +259,13 @@ export default function Dashboard() {
   );
 }
 
-// === 子组件保持不变 ===
-function NavItem({ icon, active }: { icon: React.ReactNode, active?: boolean }) {
+// === 🌟 修改：Navitem 支持 disabled 变灰样式 ===
+function NavItem({ icon, active, disabled }: { icon: React.ReactNode, active?: boolean, disabled?: boolean }) {
   return (
-    <div className={`flex items-center justify-center w-full h-10 rounded-lg cursor-pointer transition-all ${active ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}>
+    <div className={`flex items-center justify-center w-full h-10 rounded-lg transition-all 
+      ${active ? 'bg-blue-50 text-blue-600' : 'text-slate-400'}
+      ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-50 hover:text-slate-600 cursor-pointer'}
+    `}>
       {icon}
     </div>
   );
@@ -284,7 +291,7 @@ function TableRow({ img, name, source, region, status, price, onClick }: any) {
       <td className="px-6 py-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-xl shadow-inner overflow-hidden">{img}</div>
-          <span className="font-semibold text-slate-700 text-sm">{name}</span>
+          <span className="font-semibold text-slate-700 text-sm truncate max-w-[200px]">{name}</span>
         </div>
       </td>
       <td className="px-6 py-4 text-sm text-slate-500">{source}</td>
