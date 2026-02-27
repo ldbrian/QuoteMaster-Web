@@ -24,7 +24,7 @@ export default function LoginPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        router.push('/'); // 登录成功，跳转回 Dashboard
+        router.push('/dashboard'); // 登录成功，跳转回 Dashboard
       }
     } catch (error: any) {
       alert(error.message || '登录/注册失败，请重试');
@@ -37,7 +37,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${window.location.origin}/dashboard`,
       }
     });
     if (error) alert('Google 登录失败: ' + error.message);
