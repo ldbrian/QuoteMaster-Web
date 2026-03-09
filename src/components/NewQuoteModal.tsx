@@ -176,7 +176,20 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
               </>
             )}
           </div>
-
+            {/* 🌟 AI Supported Categories Prompt */}
+          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed shadow-sm">
+            <p className="font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+              💡 Supported Categories for AI Costing:
+            </p>
+            <ul className="list-disc list-inside ml-1 text-slate-500 space-y-1 text-xs">
+              <li><strong className="text-slate-600">Apparel:</strong> T-shirts, Hoodies, Jackets, Pants, Dresses, etc.</li>
+              <li><strong className="text-slate-600">Bags:</strong> Canvas bags, Tote bags, Backpacks, etc.</li>
+              <li><strong className="text-slate-600">Accessories:</strong> Caps, Beanies, Scarves, Gloves, etc.</li>
+            </ul>
+            <p className="mt-2 text-[11px] text-slate-400 italic leading-tight">
+              * Note: Precision costing for non-soft goods (e.g., hardware, electronics, plastic injection) is currently not supported.
+            </p>
+          </div>
           {/* 需求输入框 */}
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Modification Request</label>
