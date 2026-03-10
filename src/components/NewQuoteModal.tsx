@@ -25,18 +25,21 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
     try {
       // 🌟 核心防线：在上传前，狠狠地压缩它！
       console.log('压缩前大小:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+      // 🌟 核心防线：不仅压缩，强制转换所有图片为标准 JPG 格式！
       const options = {
-        maxSizeMB: 0.5, // 强制限制最大体积为 500KB (对AI看图完全足够)
-        maxWidthOrHeight: 1920, // 强制限制分辨率最大单边 1920px (完美避开 Qwen 报错)
-        useWebWorker: true
+        maxSizeMB: 0.5, 
+        maxWidthOrHeight: 1920, 
+        useWebWorker: true,
+        fileType: 'image/jpeg', // 👈 新增：强制剥离 PNG 透明层，拍扁成 JPG
+        initialQuality: 0.8     // 👈 新增：控制画质，进一步缩小体积
       };
       
       const compressedFile = await imageCompression(file, options);
-      console.log('压缩后大小:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB');
+      console.log('转换并压缩后大小:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB');
 
       // 1. 上传【压缩后】的图片到 Supabase
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
+      // 👈 抛弃原图后缀，直接写死为 .jpg，确保后端和 AI 拿到的绝对是 JPG！
+      const fileName = `${Date.now()}.jpg`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('inquiry-images')
         .upload(fileName, compressedFile); // 👈 这里改传 compressedFile
