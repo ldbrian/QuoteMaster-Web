@@ -53,7 +53,7 @@ export default function Dashboard() {
     checkAuth();
   }, [router]);
 
-  // 拉取真实数据
+  // 拉取真实数据，并处理超时孤儿任务
   const fetchLeads = async () => {
     setLoading(true);
     try {
@@ -63,11 +63,54 @@ export default function Dashboard() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setLeads(data || []);
+
+      // 🌟 新增：超时检测逻辑（3分钟未完成判定为失败）
+      const now = new Date().getTime();
+      const TIMEOUT_MS = 3 * 60 * 1000; // 3分钟
+      
+      let hasUpdates = false;
+      const processedData = data?.map((lead) => {
+        if (lead.status === 'analyzing') {
+          const leadTime = new Date(lead.created_at).getTime();
+          if (now - leadTime > TIMEOUT_MS) {
+            hasUpdates = true;
+            // 顺手在数据库里把它改成 failed
+            supabase.from('inquiries').update({ status: 'failed' }).eq('id', lead.id).then();
+            return { ...lead, status: 'failed' }; // 本地直接变状态
+          }
+        }
+        return lead;
+      });
+
+      setLeads(processedData || []);
     } catch (error) {
       console.error('Error fetching leads:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 🌟 新增：重试失败的任务
+  const handleRetry = async (lead: any, e: React.MouseEvent) => {
+    e.stopPropagation(); // 阻止点击整行打开详情页
+    
+    // 1. 乐观更新 UI 和 数据库，变回分析中
+    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'analyzing' } : l));
+    await supabase.from('inquiries').update({ status: 'analyzing' }).eq('id', lead.id);
+
+    // 2. 重新给 Python 后端发任务
+    try {
+      fetch("https://api.toughlove.online/api/get_quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inquiry_id: lead.id,
+          image_url: lead.thumbnail_url,
+          user_prompt: "重试核价任务" 
+        }),
+      });
+    } catch (error) {
+      console.log("重试任务已发送");
     }
   };
 
@@ -297,6 +340,7 @@ export default function Dashboard() {
                           status={lead.status} 
                           price={lead.estimated_value ? `$${lead.estimated_value}` : '--'} 
                           onClick={() => handleOpenDetail(lead)}
+                          onRetry={(e: React.MouseEvent) => handleRetry(lead, e)} // 👈 增加这一行
                         />
                       ))
                     )}
@@ -375,9 +419,9 @@ function StatCard({ label, value, trend, trendUp }: any) {
   );
 }
 
-function TableRow({ img, name, source, region, status, price, onClick }: any) {
-  // 如果正在分析，显示 loader
+function TableRow({ img, name, source, region, status, price, onClick, onRetry }: any) {
   const isAnalyzing = status === 'analyzing';
+  const isFailed = status === 'failed';
   
   return (
     <tr onClick={onClick} className={`transition-colors group ${isAnalyzing ? 'cursor-wait opacity-80' : 'hover:bg-slate-50/80 cursor-pointer'}`}>
@@ -401,9 +445,19 @@ function TableRow({ img, name, source, region, status, price, onClick }: any) {
       </td>
       <td className="px-6 py-4 text-sm font-bold text-slate-900">{price}</td>
       <td className="px-6 py-4 text-right">
-        <button className="text-slate-300 hover:text-blue-600 transition-colors">
-          <MoreVertical size={16} />
-        </button>
+        {/* 🌟 新增：如果是失败状态，显示醒目的重试按钮 */}
+        {isFailed ? (
+           <button 
+             onClick={onRetry} 
+             className="text-xs px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 rounded-md font-medium transition-colors"
+           >
+             重新测算
+           </button>
+        ) : (
+          <button className="text-slate-300 hover:text-blue-600 transition-colors">
+            <MoreVertical size={16} />
+          </button>
+        )}
       </td>
     </tr>
   );
