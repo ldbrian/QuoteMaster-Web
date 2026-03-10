@@ -77,7 +77,8 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
         if (!res.ok) throw new Error(`状态码: ${res.status}`);
       } catch (error: any) {
         console.error("后台任务触发失败:", error);
-        alert("🚨 无法连接到服务器，请检查网络！");
+        // 🌟 换成真实的错误提示，不再掩饰！
+        alert(`🚨 提交失败: ${error.message} \n\n(如果是 Failed to fetch，说明你宝塔里的 Python 后端挂了，请去重启 qm_api)`);
         setUploading(false);
         return; 
       }
