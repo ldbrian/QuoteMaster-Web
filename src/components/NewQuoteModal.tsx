@@ -50,9 +50,9 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
 
       if (dbError) throw dbError;
 
-      // 4. 🚀 触发 Python 异步后台任务 (不等待！)
+      // 4. 🚀 触发 Python 异步后台任务 (只需等 0.01 秒，绝不卡顿)
       try {
-        fetch("https://api.toughlove.online/api/get_quote", {
+        const res = await fetch("https://api.toughlove.online/api/get_quote", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -61,12 +61,19 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
             user_prompt: note
           }),
         });
-        // 🚨 前面没有 await，发完请求代码立刻往下走！
-      } catch (error) {
-        console.log("后台任务触发完毕");
+        
+        if (!res.ok) {
+          throw new Error(`服务器拒绝接单，状态码: ${res.status}`);
+        }
+        
+      } catch (error: any) {
+        console.error("后台任务触发失败:", error);
+        alert("🚨 无法连接到服务器，请检查网络！报错：" + error.message);
+        setUploading(false);
+        return; // 遇到错误直接中断，不关闭弹窗
       }
 
-      // 5. 瞬间关闭弹窗，回到主界面
+      // 5. 收到服务器瞬间返回的确认后，再关闭弹窗
       onSuccess();
       onClose();
       setFile(null);
