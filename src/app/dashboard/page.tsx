@@ -94,11 +94,19 @@ export default function Dashboard() {
   const handleRetry = async (lead: any, e: React.MouseEvent) => {
     e.stopPropagation(); // 阻止点击整行打开详情页
     
-    // 1. 乐观更新 UI 和 数据库，变回分析中
-    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'analyzing' } : l));
-    await supabase.from('inquiries').update({ status: 'analyzing' }).eq('id', lead.id);
+    // 获取当前最新时间，用来重置秒表
+    const nowISO = new Date().toISOString();
 
-    // 2. 重新给 Python 后端发任务
+    // 1. 乐观更新 UI，变回分析中，🌟 并且重置本地倒计时！
+    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'analyzing', created_at: nowISO } : l));
+    
+    // 2. 更新数据库：改状态，🌟 并且重置数据库的创建时间！
+    await supabase.from('inquiries').update({ 
+      status: 'analyzing',
+      created_at: nowISO  // 👈 核心修复：给它续命 3 分钟！
+    }).eq('id', lead.id);
+
+    // 3. 重新给 Python 后端发任务
     try {
       fetch("https://api.toughlove.online/api/get_quote", {
         method: "POST",
