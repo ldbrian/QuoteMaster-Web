@@ -8,15 +8,25 @@ import QuoteDetailPanel from '@/src/components/QuoteDetailPanel';
 import { 
   Search, Bell, Plus, MoreVertical, LogOut,
   LayoutGrid, FileText, Users, MessageSquare, 
-  BarChart2, Settings, Globe, Loader2 ,MessageCircle
+  BarChart2, Settings, Globe, Loader2 ,MessageCircle, Menu, X
 } from 'lucide-react';
 
-// 状态标签映射
+// 状态标签颜色映射
 const statusMap: any = {
   converted: "bg-emerald-50 text-emerald-600 border border-emerald-100",
   analyzing: "bg-blue-50 text-blue-600 border border-blue-100",
   quoted: "bg-purple-50 text-purple-600 border border-purple-100",
   pending: "bg-amber-50 text-amber-600 border border-amber-100",
+  failed: "bg-red-50 text-red-600 border border-red-100",
+};
+
+// 状态中文映射
+const statusTextMap: any = {
+  converted: "已成交",
+  analyzing: "分析中",
+  quoted: "已报价",
+  pending: "等待中",
+  failed: "失败",
 };
 
 export default function Dashboard() {
@@ -26,6 +36,7 @@ export default function Dashboard() {
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<any>(null); 
   const [user, setUser] = useState<any>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
 
   // 身份核验
@@ -60,14 +71,27 @@ export default function Dashboard() {
     }
   };
 
+  // 🌟 新增：Supabase 实时监听，后端算完自动推送刷新
+  useEffect(() => {
+    const channel = supabase
+      .channel('realtime-inquiries')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'inquiries' },
+        (payload) => {
+          console.log('🎉 收到后端处理完成推送！', payload);
+          fetchLeads(); // 静默刷新列表
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   // 🌟 核心新增：动态计算真实的 KPI 数据
   const kpiData = useMemo(() => {
-    // 1. 计算总预估价值 (只累加有价值的数字)
     const totalValue = leads.reduce((sum, lead) => sum + (Number(lead.estimated_value) || 0), 0);
-    // 格式化为美金货币格式
     const formattedTotal = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalValue);
-    
-    // 2. 计算仍在等待/分析中的数量
     const pendingCount = leads.filter(lead => lead.status === 'analyzing' || lead.status === 'pending').length;
 
     return { formattedTotal, pendingCount };
@@ -75,6 +99,9 @@ export default function Dashboard() {
 
   // 点击行的处理函数
   const handleOpenDetail = async (lead: any) => {
+    // 如果正在分析中，不可点击打开
+    if (lead.status === 'analyzing') return;
+    
     setSelectedInquiryId(lead.id);
     setDetailData(lead); 
 
@@ -113,70 +140,93 @@ export default function Dashboard() {
     return (
       <div className="h-screen bg-[#F8FAFC] flex flex-col items-center justify-center gap-3">
         <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
-        <p className="text-sm text-slate-500 font-medium">Authenticating...</p>
+        <p className="text-sm text-slate-500 font-medium">身份验证中...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] font-sans text-slate-900 selection:bg-blue-100 relative">
+    <div className="flex h-screen bg-[#F8FAFC] font-sans text-slate-900 selection:bg-blue-100 relative overflow-hidden">
       
-      {/* 左侧导航 - 🌟 升级为宽屏版，加入功能剧透和小角标 */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col py-6 gap-6 z-20 shrink-0">
+      {/* 手机端半透明遮罩层 */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* 左侧导航 - 🌟 响应式改造：手机端变为滑动抽屉，PC端固定 */}
+      <aside className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r border-slate-200 flex flex-col py-6 gap-6 z-50 shrink-0 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
         {/* Logo 和 产品名 */}
-        <div className="flex items-center gap-3 px-6 mb-2">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-200">Q</div>
-          <span className="font-bold text-lg text-slate-800 tracking-tight">QuoteMaster</span>
+        <div className="flex items-center justify-between px-6 mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-200">Q</div>
+            <span className="font-bold text-lg text-slate-800 tracking-tight">QuoteMaster</span>
+          </div>
+          <button className="md:hidden text-slate-400 hover:text-slate-600" onClick={() => setIsMobileMenuOpen(false)}>
+            <X size={20} />
+          </button>
         </div>
 
         <nav className="flex flex-col gap-2 w-full px-4">
-          <NavItem icon={<LayoutGrid size={20} />} label="AI Dashboard" active />
+          <NavItem icon={<LayoutGrid size={20} />} label="AI 工作台" active />
           
           <div className="mt-4 mb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            Workspace (Coming Soon)
+            工作空间 (即将上线)
           </div>
           
           <div onClick={handleComingSoon}>
-            <NavItem icon={<FileText size={20} />} label="Quote History" disabled badge="PRO" />
+            <NavItem icon={<FileText size={20} />} label="核价历史" disabled badge="PRO" />
           </div>
           <div onClick={handleComingSoon}>
-            <NavItem icon={<Users size={20} />} label="Client CRM" disabled />
+            <NavItem icon={<Users size={20} />} label="客户管理" disabled />
           </div>
           <div onClick={handleComingSoon}>
-            <NavItem icon={<BarChart2 size={20} />} label="Cost Analytics" disabled />
+            <NavItem icon={<BarChart2 size={20} />} label="成本分析" disabled />
           </div>
         </nav>
 
         <div className="mt-auto pb-4 px-4" onClick={handleComingSoon}>
-          <NavItem icon={<Settings size={20} />} label="Team Settings" disabled />
+          <NavItem icon={<Settings size={20} />} label="团队设置" disabled />
         </div>
       </aside>
 
       {/* 主内容区 */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="h-16 px-8 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10 border-b border-transparent">
-          <div className="relative w-96 group" onClick={handleComingSoon}>
+        <header className="h-16 px-4 md:px-8 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10 border-b border-transparent">
+          
+          {/* 手机端：汉堡菜单按钮 + 极简 Logo */}
+          <div className="flex items-center gap-3 md:hidden">
+            <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg">
+              <Menu size={24} />
+            </button>
+            <span className="font-bold text-lg text-slate-800 tracking-tight">QM</span>
+          </div>
+
+          {/* PC端：搜索框 (手机端隐藏) */}
+          <div className="relative w-96 group hidden md:block" onClick={handleComingSoon}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 opacity-50" size={16} />
-            <input readOnly type="text" placeholder="Search leads (Coming soon)..." className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm cursor-not-allowed opacity-60 focus:outline-none" />
+            <input readOnly type="text" placeholder="搜索线索 (即将上线)..." className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm cursor-not-allowed opacity-60 focus:outline-none" />
           </div>
           
-          <div className="flex items-center gap-6">
-            <button onClick={handleComingSoon} className="relative p-2 text-slate-400 hover:bg-slate-100 rounded-full opacity-50 cursor-not-allowed"><Bell size={18} /></button>
-            <div className="h-8 w-[1px] bg-slate-200"></div>
+          <div className="flex items-center gap-4 md:gap-6">
+            <button onClick={handleComingSoon} className="relative p-2 text-slate-400 hover:bg-slate-100 rounded-full opacity-50 cursor-not-allowed hidden sm:block"><Bell size={18} /></button>
+            <div className="h-8 w-[1px] bg-slate-200 hidden sm:block"></div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 md:gap-4">
               <div className="text-right hidden md:block">
                 <p className="text-sm font-bold text-slate-700 leading-none">
                   {user.email?.split('@')[0] || 'Admin'}
                 </p>
-                <p className="text-xs text-slate-400 mt-1">Workspace</p>
+                <p className="text-xs text-slate-400 mt-1">当前用户</p>
               </div>
               <button 
                 onClick={handleLogout} 
-                className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-full transition-colors" 
-                title="Logout"
+                className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-full transition-colors bg-slate-50 md:bg-transparent" 
+                title="退出登录"
               >
                 <LogOut size={18} />
               </button>
@@ -184,66 +234,66 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-8 py-8">
-          <div className="flex justify-between items-end mb-8">
+        <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 md:py-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
-              <p className="text-slate-500 text-sm mt-1">Welcome back, here are your latest AI quotes.</p>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">工作台</h1>
+              <p className="text-slate-500 text-sm mt-1">欢迎回来，这是您最近的 AI 核价记录。</p>
             </div>
             
             <button 
               onClick={() => setIsModalOpen(true)}
-              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium text-sm shadow-lg shadow-blue-200 flex items-center gap-2 hover:bg-blue-700 cursor-pointer active:scale-95 transition-all"
+              className="w-full sm:w-auto bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium text-sm shadow-lg shadow-blue-200 flex justify-center items-center gap-2 hover:bg-blue-700 cursor-pointer active:scale-95 transition-all"
             >
-              <Plus size={18} /> New AI Quote
+              <Plus size={18} /> 新建 AI 核价
             </button>
           </div>
 
           {/* 🌟 动态指标卡片 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <StatCard label="Total Inquiries" value={leads.length} trend="Real-time" trendUp={true} />
-            <StatCard label="Est. FOB Value" value={kpiData.formattedTotal} trend="Computed" trendUp={true} />
-            <StatCard label="Pending Analysis" value={kpiData.pendingCount} trend={kpiData.pendingCount > 0 ? "Action Needed" : "All Clear"} trendUp={kpiData.pendingCount === 0} />
+            <StatCard label="总询盘数" value={leads.length} trend="实时" trendUp={true} />
+            <StatCard label="预估 FOB 总值" value={kpiData.formattedTotal} trend="已计算" trendUp={true} />
+            <StatCard label="等待/分析中" value={kpiData.pendingCount} trend={kpiData.pendingCount > 0 ? "处理中" : "已全部完成"} trendUp={kpiData.pendingCount === 0} />
           </div>
 
           {/* 表格区域 */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-h-[300px]">
             <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center">
-              <h2 className="font-bold text-slate-800">Recent Inquiries</h2>
+              <h2 className="font-bold text-slate-800">最近询盘</h2>
             </div>
             
             {loading ? (
               <div className="flex justify-center items-center h-40 text-slate-400 gap-2">
-                <Loader2 className="animate-spin" /> Loading data...
+                <Loader2 className="animate-spin" /> 数据加载中...
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead className="bg-slate-50/50 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
                     <tr>
-                      <th className="px-6 py-4">Product</th>
-                      <th className="px-6 py-4">Source</th>
-                      <th className="px-6 py-4">Region</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4">Est. Value</th>
-                      <th className="px-6 py-4 text-right">Action</th>
+                      <th className="px-6 py-4">产品</th>
+                      <th className="px-6 py-4 hidden sm:table-cell">来源</th>
+                      <th className="px-6 py-4 hidden md:table-cell">地区</th>
+                      <th className="px-6 py-4">状态</th>
+                      <th className="px-6 py-4">预估价值</th>
+                      <th className="px-6 py-4 text-right">操作</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {leads.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">
-                          No quotes yet. Click "New AI Quote" to start!
+                          暂无核价记录。点击“新建 AI 核价”开始！
                         </td>
                       </tr>
                     ) : (
                       leads.map((lead) => (
                         <TableRow 
                           key={lead.id}
-                          img={lead.thumbnail_url ? <img src={lead.thumbnail_url} className="w-10 h-10 object-cover rounded-lg" /> : "📦"} 
-                          name={lead.product_name || 'Unknown Item'} 
+                          img={lead.thumbnail_url ? <img src={lead.thumbnail_url} className="w-10 h-10 object-cover rounded-lg" alt="" /> : "📦"} 
+                          name={lead.product_name || '未知产品'} 
                           source={lead.source} 
-                          region={lead.region} 
+                          region={lead.region || 'Global'} 
                           status={lead.status} 
                           price={lead.estimated_value ? `$${lead.estimated_value}` : '--'} 
                           onClick={() => handleOpenDetail(lead)}
@@ -277,7 +327,6 @@ export default function Dashboard() {
       />
       <button
         onClick={() => {
-          // 这里可以填你的微信号、邮箱，或者换成 window.open('腾讯问卷链接')
           alert("💡 欢迎吐槽！\n\n遇到 Bug 了？觉得 AI 算得不准？想加新功能？\n\n请直接联系创始人微信：[ldbrian]\n或发送邮件至：[ldbrian@163.com]\n\n老板，用得不爽直接喷我，您的每一个建议都是我们迭代的动力！");
         }}
         className="fixed bottom-8 right-8 bg-blue-600 text-white p-4 rounded-full shadow-2xl shadow-blue-300 hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all z-50 flex items-center justify-center group"
@@ -327,23 +376,27 @@ function StatCard({ label, value, trend, trendUp }: any) {
 }
 
 function TableRow({ img, name, source, region, status, price, onClick }: any) {
+  // 如果正在分析，显示 loader
+  const isAnalyzing = status === 'analyzing';
+  
   return (
-    <tr onClick={onClick} className="hover:bg-slate-50/80 transition-colors group cursor-pointer">
+    <tr onClick={onClick} className={`transition-colors group ${isAnalyzing ? 'cursor-wait opacity-80' : 'hover:bg-slate-50/80 cursor-pointer'}`}>
       <td className="px-6 py-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-xl shadow-inner overflow-hidden">{img}</div>
           <span className="font-semibold text-slate-700 text-sm truncate max-w-[200px]">{name}</span>
         </div>
       </td>
-      <td className="px-6 py-4 text-sm text-slate-500">{source}</td>
-      <td className="px-6 py-4">
+      <td className="px-6 py-4 text-sm text-slate-500 hidden sm:table-cell">{source}</td>
+      <td className="px-6 py-4 hidden md:table-cell">
         <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 uppercase tracking-wide">
           <Globe size={10} className="mr-1" /> {region}
         </span>
       </td>
       <td className="px-6 py-4">
-        <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${(statusMap as any)[status] || 'bg-slate-100 text-slate-500'}`}>
-          {status}
+        <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${(statusMap as any)[status] || 'bg-slate-100 text-slate-500'} flex items-center gap-1`}>
+          {isAnalyzing && <Loader2 size={10} className="animate-spin" />}
+          {statusTextMap[status] || status}
         </span>
       </td>
       <td className="px-6 py-4 text-sm font-bold text-slate-900">{price}</td>

@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { X, Edit2, Save, AlertCircle, DollarSign, Calculator, FileText, MessageSquareQuote } from "lucide-react";
 
-// 1. 🌟 关键修复：适配真实后端传过来的 JSON 结构
 interface BOMItem {
   id?: string;
-  item?: string; // 后端传过来的是 item
-  name?: string; // 兼容老代码
+  item?: string; 
+  name?: string; 
   cost: number;
   unit?: string;
   notes?: string;
@@ -15,10 +14,10 @@ interface QuoteData {
   id?: string;
   product_name?: string;
   total_fob_price?: number; 
-  final_price?: number; // 后端真实的最终价
+  final_price?: number; 
   total_cost?: number;
   bom?: BOMItem[];
-  analysis_reasoning?: string; // AI 的深度分析
+  analysis_reasoning?: string; 
 }
 
 interface QuoteDetailPanelProps {
@@ -38,29 +37,25 @@ export default function QuoteDetailPanel({
   const [editableBom, setEditableBom] = useState<BOMItem[]>([]);
   const [margin, setMargin] = useState<number>(0);
 
-  // 初始化数据
   useEffect(() => {
     if (quoteData && isOpen) {
       setEditableBom(JSON.parse(JSON.stringify(quoteData.bom || [])));
       setIsEditing(false);
       
-      // 如果后端传了 final_price，我们要算出它和纯 BOM 成本的差价，自动填入“弹性溢价”里
       const bomTotal = (quoteData.bom || []).reduce((sum, i) => sum + (Number(i.cost) || 0), 0);
       const aiFinalPrice = quoteData.final_price || quoteData.total_cost || 0;
       
-      // 自动计算 AI 预留的溢价空间
       const initialMargin = aiFinalPrice > bomTotal ? (aiFinalPrice - bomTotal) : 0;
       setMargin(Number(initialMargin.toFixed(2)));
     }
   }, [quoteData, isOpen]);
 
-  // 财务引擎：实时计算总价
   const calculatedTotal = useMemo(() => {
     const bomTotal = editableBom.reduce((sum, item) => sum + (Number(item.cost) || 0), 0);
     return bomTotal + (Number(margin) || 0);
   }, [editableBom, margin]);
 
-  // 🌟 自动生成英文销售话术
+  // 英文话术保持英文，因为这是发给国外客户的
   const generatedPitch = useMemo(() => {
     const productName = quoteData?.product_name || "the requested item";
     const price = calculatedTotal.toFixed(2);
@@ -105,7 +100,7 @@ Best regards,
               AI 智能核价单
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-              {quoteData.product_name || "系统客观拆解，支持人工覆写"}
+              {quoteData.product_name || "系统客观拆解，支持人工微调"}
             </p>
           </div>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition">
@@ -116,13 +111,12 @@ Best regards,
         {/* 内容区 */}
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           
-          {/* 🌟 新增：AI 分析结论 (只读) */}
           {quoteData.analysis_reasoning && (
             <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4">
               <h3 className="text-sm font-bold text-blue-800 flex items-center gap-1.5 mb-2">
                 <FileText className="w-4 h-4" /> AI 核价依据
               </h3>
-              <p className="text-sm text-blue-700 leading-relaxed">
+              <p className="text-sm text-blue-700 leading-relaxed whitespace-pre-wrap">
                 {quoteData.analysis_reasoning}
               </p>
             </div>
@@ -157,7 +151,6 @@ Best regards,
                   {editableBom.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-50/50 transition">
                       <td className="px-4 py-3">
-                        {/* 🌟 兼容后端的 item 字段 */}
                         <span className="font-medium text-gray-800">{item.item || item.name}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -205,7 +198,6 @@ Best regards,
             </div>
           </div>
 
-          {/* 🌟 新增：英文话术生成器 */}
           <div>
             <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5 mb-3">
               <MessageSquareQuote className="w-4 h-4" /> 推荐回复话术 (草稿)

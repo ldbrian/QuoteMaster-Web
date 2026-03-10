@@ -18,7 +18,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
   if (!isOpen) return null;
 
   const handleSubmit = async () => {
-    if (!file) return alert('Please upload an image first');
+    if (!file) return alert('请先上传一张图片');
     setUploading(true);
 
     try {
@@ -40,8 +40,8 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
       const { data: newInquiry, error: dbError } = await supabase
         .from('inquiries')
         .insert({
-          product_name: 'Analyzing...', 
-          source: 'Dashboard Upload',
+          product_name: '分析中...', 
+          source: '工作台上传',
           status: 'analyzing',
           thumbnail_url: publicUrl,
         })
@@ -50,80 +50,23 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
 
       if (dbError) throw dbError;
 
-      // 4. 发送给后端大模型计算
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("user_prompt", note);
-
-      const sendRequest = async (isRetry = false) => {
-        const freshFormData = new FormData();
-        freshFormData.append("file", file);
-        freshFormData.append("user_prompt", note);
-        
-        const url = isRetry 
-          ? `https://api.toughlove.online/api/get_quote?t=${Date.now()}` 
-          : "https://api.toughlove.online/api/get_quote";
-
-        return await fetch(url, {
-          method: "POST",
-          body: freshFormData,
-        });
-      };
-
-      let response;
-      let result;
-
+      // 4. 🚀 触发 Python 异步后台任务 (不等待！)
       try {
-        // 第一次正常发车
-        response = await sendRequest(false);
-      } catch (firstError) {
-        console.warn("⚠️ 触雷！遇到僵尸连接，准备执行清场协议...", firstError);
-        
-        // 🌟 破壁魔法 1：扔一个极轻的 GET 请求出去当“扫雷兵”，把连接池里的坏网线消耗掉
-        try { await fetch("https://api.toughlove.online/", { method: "GET" }); } catch (e) {}
-        
-        // 🌟 破壁魔法 2：强制代码休眠 1 秒钟，给浏览器内核时间把底层垃圾彻底倒掉
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        console.warn("🔄 垃圾清理完毕，发起全新重连！");
-        // 🌟 破壁魔法 3：重新打包文件，加上时间戳，强制使用新网线！
-        response = await sendRequest(true);
-      }
-
-      // 如果连扫雷重试都失败了，抛出真实错误
-      if (!response || !response.ok) {
-        throw new Error(`HTTP error! status: ${response?.status}`);
-      }
-      
-      result = await response.json();
-      console.log("🎉 AI 估价成功返回:", result);
-
-      // 5. 🚀 关键修复：把 AI 的结果更新到 Supabase 数据库！
-      if (result && !result.error) {
-        // 5.1 更新主订单状态（解除 analyzing 状态，更新真实价格）
-        await supabase
-          .from('inquiries')
-          .update({
-            status: 'quoted', // 状态改为已报价
-            product_name: result.product_name || 'AI Quoted Item',
-            estimated_value: result.final_price || result.total_cost || 0,
-          })
-          .eq('id', newInquiry.id);
-
-        // 5.2 把详细的 BOM 表和分析理由存入 messages 表（供详情页展示）
-        const aiReply = `根据您的图片分析：\n\n【成本估算】\n${result.analysis_reasoning}\n\n最终FOB报价: $${result.final_price}`;
-        await supabase.from('messages').insert({
-          inquiry_id: newInquiry.id,
-          role: 'assistant',
-          content: aiReply,
-          quote_data: result // 把整个 json 存进去
+        fetch("https://api.toughlove.online/api/get_quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            inquiry_id: newInquiry.id,
+            image_url: publicUrl,
+            user_prompt: note
+          }),
         });
-      } else {
-        // 如果后端报错，把状态改为 failed
-        await supabase.from('inquiries').update({ status: 'failed' }).eq('id', newInquiry.id);
+        // 🚨 前面没有 await，发完请求代码立刻往下走！
+      } catch (error) {
+        console.log("后台任务触发完毕");
       }
 
-      // 6. 成功回调，关闭弹窗，刷新主界面
+      // 5. 瞬间关闭弹窗，回到主界面
       onSuccess();
       onClose();
       setFile(null);
@@ -131,10 +74,9 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
       
     } catch (error: any) {
       console.error('Full error:', error);
-      alert('Upload or analysis failed: ' + (error.message || 'Unknown error'));
-    } finally {
-      setUploading(false); // 永远别忘了关掉转圈圈
-    }
+      alert('上传或分析失败: ' + (error.message || '未知错误'));
+      setUploading(false); // 出错时关闭 loading
+    } 
   };
 
   return (
@@ -143,7 +85,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h3 className="font-bold text-slate-800">New AI Quote</h3>
+          <h3 className="font-bold text-slate-800">新建 AI 核价</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X size={20} />
           </button>
@@ -164,39 +106,41 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
               <div className="flex flex-col items-center text-blue-600">
                 <FileImage size={40} className="mb-2" />
                 <p className="text-sm font-medium text-center px-4 truncate max-w-[200px]">{file.name}</p>
-                <p className="text-xs text-blue-400 mt-1">Click to replace</p>
+                <p className="text-xs text-blue-400 mt-1">点击替换图片</p>
               </div>
             ) : (
               <>
                 <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                   <Upload size={20} className="text-slate-500" />
                 </div>
-                <p className="text-sm font-medium text-slate-600">Click or Drag to upload</p>
-                <p className="text-xs text-slate-400 mt-1">Supports JPG, PNG (Max 5MB)</p>
+                <p className="text-sm font-medium text-slate-600">点击或拖拽上传图片</p>
+                <p className="text-xs text-slate-400 mt-1">支持 JPG, PNG (最大 5MB)</p>
               </>
             )}
           </div>
-            {/* 🌟 AI Supported Categories Prompt */}
+          
+          {/* 🌟 AI Supported Categories Prompt */}
           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed shadow-sm">
             <p className="font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-              💡 Supported Categories for AI Costing:
+              💡 AI 智能核价支持品类：
             </p>
             <ul className="list-disc list-inside ml-1 text-slate-500 space-y-1 text-xs">
-              <li><strong className="text-slate-600">Apparel:</strong> T-shirts, Hoodies, Jackets, Pants, Dresses, etc.</li>
-              <li><strong className="text-slate-600">Bags:</strong> Canvas bags, Tote bags, Backpacks, etc.</li>
-              <li><strong className="text-slate-600">Accessories:</strong> Caps, Beanies, Scarves, Gloves, etc.</li>
+              <li><strong className="text-slate-600">服装：</strong>T恤、卫衣、外套、长短裤、裙装等</li>
+              <li><strong className="text-slate-600">箱包：</strong>帆布袋、托特包、背包等</li>
+              <li><strong className="text-slate-600">帽类与配饰：</strong>棒球帽、针织帽、围巾、手套等</li>
             </ul>
             <p className="mt-2 text-[11px] text-slate-400 italic leading-tight">
-              * Note: Precision costing for non-soft goods (e.g., hardware, electronics, plastic injection) is currently not supported.
+              * 注：暂不支持五金、电子、注塑等非柔性制造品类的精准核价。
             </p>
           </div>
+
           {/* 需求输入框 */}
           <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Modification Request</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">客户特殊要求/修改备注</label>
             <textarea 
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="E.g. Change fabric to organic cotton, add embroidery logo on chest..."
+              placeholder="例如：面料换成有机棉，胸前加一个刺绣 Logo..."
               className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none min-h-[100px] resize-none"
             />
           </div>
@@ -206,7 +150,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
             disabled={uploading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {uploading ? <Loader2 className="animate-spin" size={20} /> : 'Start AI Analysis'}
+            {uploading ? <Loader2 className="animate-spin" size={20} /> : '开始 AI 智能核价'}
           </button>
         </div>
 
