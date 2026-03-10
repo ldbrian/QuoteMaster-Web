@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { X, Upload, Loader2, FileImage } from 'lucide-react';
 import { supabase } from '@/src/utils/supabase/client'; 
+import imageCompression from 'browser-image-compression';
 
 interface NewQuoteModalProps {
   isOpen: boolean;
@@ -22,12 +23,23 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
     setUploading(true);
 
     try {
-      // 1. 上传图片到 Supabase Storage
+      // 🌟 核心防线：在上传前，狠狠地压缩它！
+      console.log('压缩前大小:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+      const options = {
+        maxSizeMB: 0.5, // 强制限制最大体积为 500KB (对AI看图完全足够)
+        maxWidthOrHeight: 1920, // 强制限制分辨率最大单边 1920px (完美避开 Qwen 报错)
+        useWebWorker: true
+      };
+      
+      const compressedFile = await imageCompression(file, options);
+      console.log('压缩后大小:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB');
+
+      // 1. 上传【压缩后】的图片到 Supabase
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('inquiry-images')
-        .upload(fileName, file);
+        .upload(fileName, compressedFile); // 👈 这里改传 compressedFile
 
       if (uploadError) throw uploadError;
 
@@ -36,7 +48,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
         .from('inquiry-images')
         .getPublicUrl(fileName);
 
-      // 3. 在数据库创建新询盘，状态设为 analyzing
+      // 3. 在数据库创建新询盘
       const { data: newInquiry, error: dbError } = await supabase
         .from('inquiries')
         .insert({
@@ -50,7 +62,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
 
       if (dbError) throw dbError;
 
-      // 4. 🚀 触发 Python 异步后台任务 (只需等 0.01 秒，绝不卡顿)
+      // 4. 🚀 触发 Python 异步后台任务 
       try {
         const res = await fetch("https://api.toughlove.online/api/get_quote", {
           method: "POST",
@@ -62,18 +74,15 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
           }),
         });
         
-        if (!res.ok) {
-          throw new Error(`服务器拒绝接单，状态码: ${res.status}`);
-        }
-        
+        if (!res.ok) throw new Error(`状态码: ${res.status}`);
       } catch (error: any) {
         console.error("后台任务触发失败:", error);
-        alert("🚨 无法连接到服务器，请检查网络！报错：" + error.message);
+        alert("🚨 无法连接到服务器，请检查网络！");
         setUploading(false);
-        return; // 遇到错误直接中断，不关闭弹窗
+        return; 
       }
 
-      // 5. 收到服务器瞬间返回的确认后，再关闭弹窗
+      // 5. 瞬间关闭弹窗
       onSuccess();
       onClose();
       setFile(null);
@@ -82,7 +91,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
     } catch (error: any) {
       console.error('Full error:', error);
       alert('上传或分析失败: ' + (error.message || '未知错误'));
-      setUploading(false); // 出错时关闭 loading
+      setUploading(false);
     } 
   };
 
