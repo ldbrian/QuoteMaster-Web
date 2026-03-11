@@ -66,24 +66,35 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
       if (dbError) throw dbError;
 
       // 4. 🚀 触发 Python 异步后台任务 
-      try {
-        const res = await fetch("https://api.toughlove.online/api/get_quote", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            inquiry_id: newInquiry.id,
-            image_url: publicUrl,
-            user_prompt: note
-          }),
-        });
-        
-        if (!res.ok) throw new Error(`状态码: ${res.status}`);
-      } catch (error: any) {
-        console.error("后台任务触发失败:", error);
-        // 🌟 换成真实的错误提示，不再掩饰！
-        alert(`🚨 提交失败: ${error.message} \n\n(如果是 Failed to fetch，说明你宝塔里的 Python 后端挂了，请去重启 qm_api)`);
-        setUploading(false);
-        return; 
+      // 🚀 终极防断连装甲：最多尝试 3 次发包
+      let res;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          res = await fetch("https://api.toughlove.online/api/get_quote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              inquiry_id: newInquiry.id,
+              image_url: publicUrl,
+              user_prompt: note
+            }),
+          });
+          
+          if (res.ok) {
+            console.log(`🎉 第 ${attempt} 次请求成功！`);
+            break; // 一旦成功，立刻跳出循环
+          } else {
+            throw new Error(`状态码异常: ${res.status}`);
+          }
+        } catch (error) {
+          if (attempt === 3) {
+            // 如果 3 次都失败了，那才是真死了，抛出错误给外层的 catch
+            throw error; 
+          }
+          console.warn(`⚠️ 网络闪断 (尝试 ${attempt}/3)，0.5秒后静默重试...`);
+          // 核心魔法：停顿 0.5 秒，让浏览器强制建立一条新的 TCP 通道
+          await new Promise(resolve => setTimeout(resolve, 500)); 
+        }
       }
 
       // 5. 瞬间关闭弹窗
