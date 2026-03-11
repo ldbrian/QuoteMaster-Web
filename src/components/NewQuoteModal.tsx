@@ -71,14 +71,18 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           res = await fetch("https://api.toughlove.online/api/get_quote", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              inquiry_id: newInquiry.id,
-              image_url: publicUrl,
-              user_prompt: note
-            }),
-          });
+          method: "POST",
+          mode: "cors", // 👈 显式声明跨域模式
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json" // 👈 明确告诉服务器我们需要 JSON 响应
+          },
+          body: JSON.stringify({
+            inquiry_id: newInquiry.id,
+            image_url: publicUrl,
+            user_prompt: note
+          }),
+        });
           
           if (res.ok) {
             console.log(`🎉 第 ${attempt} 次请求成功！`);
