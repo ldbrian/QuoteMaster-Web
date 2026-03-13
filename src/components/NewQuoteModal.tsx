@@ -11,10 +11,10 @@ interface NewQuoteModalProps {
   onSuccess: () => void;
 }
 
-const MAX_IMAGES = 4; // 👈 CTO 设定：最多 4 张，防止 AI 引擎 Token 爆炸
+const MAX_IMAGES = 4; // CTO 设定：最多 4 张
 
 export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteModalProps) {
-  const [files, setFiles] = useState<File[]>([]); // 👈 状态改为数组
+  const [files, setFiles] = useState<File[]>([]); 
   const [note, setNote] = useState('');
   const [uploading, setUploading] = useState(false);
 
@@ -40,21 +40,20 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
     setUploading(true);
 
     try {
-      // 🌟 核心防线 2.0：并发压缩多张图片
+      // 并发压缩多张图片
       const options = {
         maxSizeMB: 0.5, 
         maxWidthOrHeight: 1920, 
         useWebWorker: true,
-        fileType: 'image/jpeg', // 强制 JPG
+        fileType: 'image/jpeg', 
         initialQuality: 0.8     
       };
       
       console.log(`开始并发压缩 ${files.length} 张图片...`);
       const compressedFiles = await Promise.all(files.map(file => imageCompression(file, options)));
 
-      // 1. 并发上传图片到 Supabase
+      // 并发上传图片到 Supabase
       const uploadPromises = compressedFiles.map(async (compressedFile, index) => {
-        // 👈 使用时间戳+索引，防止并发时文件名冲突
         const fileName = `${Date.now()}-${index}.jpg`;
         const { data, error } = await supabase.storage
           .from('inquiry-images')
@@ -72,15 +71,14 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
       const imageUrls = await Promise.all(uploadPromises);
       console.log('所有图片上传完毕，链接:', imageUrls);
 
-      // 2. 在数据库创建新询盘
+      // 在数据库创建新询盘
       const { data: newInquiry, error: dbError } = await supabase
         .from('inquiries')
         .insert({
           product_name: '分析中...', 
           source: '工作台上传',
           status: 'analyzing',
-          thumbnail_url: imageUrls[0], // 首图做封面
-          // ⚠️ 注意：你的数据库里需要加一个 image_urls (JSONB) 字段来存整个数组
+          thumbnail_url: imageUrls[0], 
           image_urls: imageUrls 
         })
         .select()
@@ -88,7 +86,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
 
       if (dbError) throw dbError;
 
-      // 3. 🚀 触发 Python 异步后台任务 (防断连装甲依旧生效)
+      // 触发 Python 异步后台任务
       let res;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
@@ -97,7 +95,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               inquiry_id: newInquiry.id,
-              image_urls: imageUrls, // 👈 注意：这里从 image_url 改成了 image_urls 数组传给后端！
+              image_urls: imageUrls, 
               user_prompt: note
             }),
           });
@@ -111,7 +109,6 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
         }
       }
 
-      // 4. 清理现场
       onSuccess();
       onClose();
       setFiles([]);
@@ -176,6 +173,21 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
                 <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
               </label>
             )}
+          </div>
+
+          {/* 🌟 补回来的：AI Supported Categories Prompt */}
+          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed shadow-sm">
+            <p className="font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+              💡 AI 智能核价支持品类：
+            </p>
+            <ul className="list-disc list-inside ml-1 text-slate-500 space-y-1 text-xs">
+              <li><strong className="text-slate-600">服装：</strong>T恤、卫衣、外套、长短裤、裙装等</li>
+              <li><strong className="text-slate-600">箱包：</strong>帆布袋、托特包、背包等</li>
+              <li><strong className="text-slate-600">帽类与配饰：</strong>棒球帽、针织帽、围巾、手套等</li>
+            </ul>
+            <p className="mt-2 text-[11px] text-slate-400 italic leading-tight">
+              * 注：暂不支持五金、电子、注塑等非柔性制造品类的精准核价。
+            </p>
           </div>
 
           {/* 需求输入框 */}
