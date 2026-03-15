@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { X, Edit2, Save, AlertCircle, DollarSign, Calculator, FileText, MessageSquareQuote, Send, Loader2 } from "lucide-react";
+import { X, Edit2, Save, AlertCircle, DollarSign, Calculator, FileText, MessageSquareQuote, Loader2, Send } from "lucide-react";
 
 interface BOMItem {
   id?: string;
@@ -33,20 +33,20 @@ export default function QuoteDetailPanel({
   quoteData,
   onSave,
 }: QuoteDetailPanelProps) {
-  // 🌟 新增：接管全局状态，方便 AI 纠错后覆盖
+  // 🌟 接管全局状态，方便 AI 纠错后覆盖
   const [localData, setLocalData] = useState<QuoteData | null>(null);
   
   const [isEditing, setIsEditing] = useState(false);
   const [editableBom, setEditableBom] = useState<BOMItem[]>([]);
   const [margin, setMargin] = useState<number>(0);
   
-  // 🌟 新增：AI 纠错相关的状态
+  // 🌟 AI 纠错专用的状态
   const [aiNote, setAiNote] = useState('');
   const [isAiFixing, setIsAiFixing] = useState(false);
 
   useEffect(() => {
     if (quoteData && isOpen) {
-      setLocalData(quoteData); // 初始化全局数据
+      setLocalData(quoteData); 
       setEditableBom(JSON.parse(JSON.stringify(quoteData.bom || [])));
       setIsEditing(false);
       
@@ -63,7 +63,6 @@ export default function QuoteDetailPanel({
     return bomTotal + (Number(margin) || 0);
   }, [editableBom, margin]);
 
-  // 英文话术保持英文，因为这是发给国外客户的
   const generatedPitch = useMemo(() => {
     const productName = localData?.product_name || "the requested item";
     const price = calculatedTotal.toFixed(2);
@@ -95,9 +94,9 @@ Best regards,
     }
   };
 
-  // 🤖 核心新增：AI 一键纠错重算（小白模式）
+  // 🤖 AI 一键纠错重算（小白纠偏模式）
   const handleAiFix = async () => {
-    if (!aiNote.trim()) return alert('请写一下哪里算错了？例如：亮片只有50个');
+    if (!aiNote.trim()) return alert('请告诉 AI 哪里算错了？例如：亮片只有50个');
     if (!localData?.id) return alert('找不到订单ID，无法重算');
     
     setIsAiFixing(true);
@@ -108,41 +107,36 @@ Best regards,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           inquiry_id: localData.id,
-          old_quote: localData, // 把当前的错误数据发给 AI 做靶子
-          user_note: aiNote   // 业务员的吐槽
+          old_quote: localData, // 把旧数据传过去
+          user_note: aiNote   // 业务员的吐槽指令
         }),
       });
 
       if (!res.ok) throw new Error('网络请求失败');
       const result = await res.json();
-      
       const newData = result.new_data;
       
       // 1. 用 AI 返回的最新数据覆盖本地状态
       setLocalData(newData);
       setEditableBom(newData.bom || []);
       
-      // 2. 重新计算溢价 (保持之前的差价逻辑)
+      // 2. 重新计算溢价
       const newBomTotal = (newData.bom || []).reduce((sum: number, i: any) => sum + (Number(i.cost) || 0), 0);
       const aiFinalPrice = newData.final_price || newData.total_cost || 0;
       const initialMargin = aiFinalPrice > newBomTotal ? (aiFinalPrice - newBomTotal) : 0;
       setMargin(Number(initialMargin.toFixed(2)));
 
       setAiNote(''); // 清空输入框
-      alert('🎉 AI 纠错成功，已自动更新报价表！');
+      alert('🎉 AI 纠错成功，已自动更新 BOM 成本与总价！');
       
-      // 3. 顺便触发一下父组件的保存回调，更新列表
+      // 3. 触发列表更新
       if (onSave) {
-        onSave({
-          ...newData,
-          final_price: aiFinalPrice,
-          margin: initialMargin
-        });
+        onSave({ ...newData, final_price: aiFinalPrice, margin: initialMargin });
       }
       
     } catch (error) {
       console.error(error);
-      alert('AI 纠错超时或失败，请重试');
+      alert('AI 纠错请求失败，请检查网络或后端日志');
     } finally {
       setIsAiFixing(false);
     }
@@ -170,43 +164,43 @@ Best regards,
         </div>
 
         {/* 内容区 */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
           
+          {/* 🌟 核心改动：把纠错框无缝融合到了 AI 依据下面 */}
           {localData.analysis_reasoning && (
-            <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4">
+            <div className="bg-blue-50/50 border border-blue-200 rounded-xl p-4 shadow-sm">
               <h3 className="text-sm font-bold text-blue-800 flex items-center gap-1.5 mb-2">
                 <FileText className="w-4 h-4" /> AI 核价依据
               </h3>
-              <p className="text-sm text-blue-700 leading-relaxed whitespace-pre-wrap">
+              <p className="text-sm text-blue-700 leading-relaxed whitespace-pre-wrap mb-4">
                 {localData.analysis_reasoning}
               </p>
+              
+              {/* 🛠️ AI 纠错重算模块 */}
+              <div className="border-t border-blue-200/60 pt-3 mt-2">
+                <label className="flex items-center gap-1.5 text-[11px] font-bold text-blue-800 mb-2 uppercase tracking-wider">
+                  <AlertCircle className="w-3.5 h-3.5" /> 发现 AI 算错了？输入反馈让它重算
+                </label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={aiNote}
+                    onChange={(e) => setAiNote(e.target.value)}
+                    placeholder="例如：亮片只有50个左右..."
+                    className="flex-1 px-3 py-2 rounded-md border border-blue-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-800 placeholder:text-gray-400"
+                    onKeyDown={(e) => e.key === 'Enter' && handleAiFix()}
+                  />
+                  <button 
+                    onClick={handleAiFix}
+                    disabled={isAiFixing || !aiNote.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-md flex items-center justify-center transition-colors disabled:opacity-50 disabled:bg-blue-400"
+                  >
+                    {isAiFixing ? <Loader2 className="w-4 h-4 animate-spin" /> : '重算'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
-
-          {/* 🛠️ CTO 注入：AI 纠错输入框 (对付幻觉的终极武器) */}
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl">
-            <label className="flex items-center gap-1.5 text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">
-              <AlertCircle className="w-4 h-4" /> 发现 AI 算错了？告诉它错在哪
-            </label>
-            <div className="flex gap-2">
-              <input 
-                type="text" 
-                value={aiNote}
-                onChange={(e) => setAiNote(e.target.value)}
-                placeholder="例如：AI你看错了，亮片只有50个..."
-                className="flex-1 px-3 py-2 rounded-md border border-amber-200 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white text-gray-800"
-                onKeyDown={(e) => e.key === 'Enter' && handleAiFix()}
-              />
-              <button 
-                onClick={handleAiFix}
-                disabled={isAiFixing || !aiNote.trim()}
-                className="bg-amber-500 hover:bg-amber-600 text-white px-4 rounded-md flex items-center justify-center transition-colors disabled:opacity-50"
-                title="发送给 AI 重新核算"
-              >
-                {isAiFixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
 
           {/* 表格区 */}
           <div>
