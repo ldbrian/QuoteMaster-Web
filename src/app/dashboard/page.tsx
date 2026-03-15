@@ -8,8 +8,8 @@ import QuoteDetailPanel from '@/src/components/QuoteDetailPanel';
 import { 
   Search, Bell, Plus, MoreVertical, LogOut,
   LayoutGrid, FileText, Users, MessageSquare, 
-  BarChart2, Settings, Globe, Loader2 ,MessageCircle, Menu, X
-} from 'lucide-react';
+  BarChart2, Settings, Globe, Loader2 ,MessageCircle, Menu, X, Trash2
+} from 'lucide-react'; // 👈 CTO 新增了 Trash2 图标
 
 // 状态标签颜色映射
 const statusMap: any = {
@@ -64,7 +64,7 @@ export default function Dashboard() {
 
       if (error) throw error;
 
-      // 🌟 新增：超时检测逻辑（3分钟未完成判定为失败）
+      // 超时检测逻辑（3分钟未完成判定为失败）
       const now = new Date().getTime();
       const TIMEOUT_MS = 3 * 60 * 1000; // 3分钟
       
@@ -90,20 +90,20 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 新增：重试失败的任务
+  // 重试失败的任务
   const handleRetry = async (lead: any, e: React.MouseEvent) => {
     e.stopPropagation(); // 阻止点击整行打开详情页
     
     // 获取当前最新时间，用来重置秒表
     const nowISO = new Date().toISOString();
 
-    // 1. 乐观更新 UI，变回分析中，🌟 并且重置本地倒计时！
+    // 1. 乐观更新 UI，变回分析中，并且重置本地倒计时！
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'analyzing', created_at: nowISO } : l));
     
-    // 2. 更新数据库：改状态，🌟 并且重置数据库的创建时间！
+    // 2. 更新数据库：改状态，并且重置数据库的创建时间！
     await supabase.from('inquiries').update({ 
       status: 'analyzing',
-      created_at: nowISO  // 👈 核心修复：给它续命 3 分钟！
+      created_at: nowISO  
     }).eq('id', lead.id);
 
     // 3. 重新给 Python 后端发任务
@@ -122,7 +122,35 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 新增：Supabase 实时监听，后端算完自动推送刷新
+  // 🌟 CTO 新增：删除核价记录的终极函数
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // 防止点击删除时触发整行的跳转/点击事件
+    
+    // 1. 防呆确认
+    const isConfirmed = window.confirm('确定要删除这条核价记录吗？删除后无法恢复。');
+    if (!isConfirmed) return;
+
+    try {
+      // 2. 乐观更新：让数据在前端瞬间消失，体验极度丝滑
+      setLeads((prev) => prev.filter((item) => item.id !== id));
+
+      // 3. 真实数据库删除操作
+      const { error } = await supabase
+        .from('inquiries')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+    } catch (error: any) {
+      console.error('删除失败:', error);
+      alert('删除失败: ' + error.message);
+      // 如果报错了，为了安全起见，重新拉取一次真实的数据库列表兜底
+      fetchLeads(); 
+    }
+  };
+
+  // Supabase 实时监听，后端算完自动推送刷新
   useEffect(() => {
     const channel = supabase
       .channel('realtime-inquiries')
@@ -139,7 +167,7 @@ export default function Dashboard() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // 🌟 核心新增：动态计算真实的 KPI 数据
+  // 动态计算真实的 KPI 数据
   const kpiData = useMemo(() => {
     const totalValue = leads.reduce((sum, lead) => sum + (Number(lead.estimated_value) || 0), 0);
     const formattedTotal = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalValue);
@@ -207,7 +235,7 @@ export default function Dashboard() {
         />
       )}
 
-      {/* 左侧导航 - 🌟 响应式改造：手机端变为滑动抽屉，PC端固定 */}
+      {/* 左侧导航 - 响应式改造：手机端变为滑动抽屉，PC端固定 */}
       <aside className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r border-slate-200 flex flex-col py-6 gap-6 z-50 shrink-0 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
         {/* Logo 和 产品名 */}
@@ -300,7 +328,7 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* 🌟 动态指标卡片 */}
+          {/* 动态指标卡片 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <StatCard label="总询盘数" value={leads.length} trend="实时" trendUp={true} />
             <StatCard label="预估 FOB 总值" value={kpiData.formattedTotal} trend="已计算" trendUp={true} />
@@ -348,7 +376,8 @@ export default function Dashboard() {
                           status={lead.status} 
                           price={lead.estimated_value ? `$${lead.estimated_value}` : '--'} 
                           onClick={() => handleOpenDetail(lead)}
-                          onRetry={(e: React.MouseEvent) => handleRetry(lead, e)} // 👈 增加这一行
+                          onRetry={(e: React.MouseEvent) => handleRetry(lead, e)} 
+                          onDelete={(e: React.MouseEvent) => handleDelete(lead.id, e)} // 👈 传递给子组件的删除函数
                         />
                       ))
                     )}
@@ -392,7 +421,7 @@ export default function Dashboard() {
   );
 }
 
-// === 🌟 修改：Navitem 支持 disabled 变灰样式 ===
+// === 修改：Navitem 支持 disabled 变灰样式 ===
 function NavItem({ icon, label, active, disabled, badge }: { icon: React.ReactNode, label?: string, active?: boolean, disabled?: boolean, badge?: string }) {
   return (
     <div className={`flex items-center justify-between w-full px-4 h-11 rounded-lg transition-all 
@@ -427,7 +456,7 @@ function StatCard({ label, value, trend, trendUp }: any) {
   );
 }
 
-function TableRow({ img, name, source, region, status, price, onClick, onRetry }: any) {
+function TableRow({ img, name, source, region, status, price, onClick, onRetry, onDelete }: any) {
   const isAnalyzing = status === 'analyzing';
   const isFailed = status === 'failed';
   
@@ -453,19 +482,32 @@ function TableRow({ img, name, source, region, status, price, onClick, onRetry }
       </td>
       <td className="px-6 py-4 text-sm font-bold text-slate-900">{price}</td>
       <td className="px-6 py-4 text-right">
-        {/* 🌟 新增：如果是失败状态，显示醒目的重试按钮 */}
-        {isFailed ? (
-           <button 
-             onClick={onRetry} 
-             className="text-xs px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 rounded-md font-medium transition-colors"
-           >
-             重新测算
-           </button>
-        ) : (
-          <button className="text-slate-300 hover:text-blue-600 transition-colors">
-            <MoreVertical size={16} />
+        
+        {/* 🌟 CTO 级改造：动作区重构，把删除按钮优雅地加进去 */}
+        <div className="flex items-center justify-end gap-3">
+          {isFailed ? (
+             <button 
+               onClick={onRetry} 
+               className="text-xs px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 rounded-md font-medium transition-colors"
+             >
+               重新测算
+             </button>
+          ) : (
+            <button className="p-1.5 text-slate-300 hover:text-blue-600 hover:bg-slate-100 rounded-md transition-colors" title="更多操作">
+              <MoreVertical size={16} />
+            </button>
+          )}
+
+          {/* 垃圾桶按钮，所有状态均可删除 */}
+          <button 
+            onClick={onDelete} 
+            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+            title="删除记录"
+          >
+            <Trash2 size={16} />
           </button>
-        )}
+        </div>
+
       </td>
     </tr>
   );
