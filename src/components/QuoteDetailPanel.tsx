@@ -102,23 +102,13 @@ Best regards,
     setIsAiFixing(true);
 
     try {
-      // 🛡️ CTO 级防弹衣：给发给后端的数据“洗个澡”！
-      // 绝对不能把包含图片 URL 的整个 localData 发过去，会被宝塔入侵检测当成黑客秒杀！
-      // 我们只挑 AI 认识的纯净文本数据发过去：
-      const cleanQuoteData = {
-        product_name: localData.product_name,
-        bom: editableBom, // 发送当前表格里的最新明细
-        final_price: calculatedTotal,
-        analysis_reasoning: localData.analysis_reasoning
-      };
-
+      // 🛡️ CTO 级架构升级：前端不再发送庞大的 JSON 给防火墙扫描，只发极其干净的 ID 和一句指令！
       const res = await fetch("https://api.toughlove.online/api/fix_quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           inquiry_id: localData.id,
-          old_quote: cleanQuoteData, // 👈 只发送洗干净的纯文本对象
-          user_note: aiNote
+          user_note: aiNote   // 只有一句话，Nginx 绝对秒放行
         }),
       });
 
