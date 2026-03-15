@@ -102,13 +102,23 @@ Best regards,
     setIsAiFixing(true);
 
     try {
+      // 🛡️ CTO 级防弹衣：给发给后端的数据“洗个澡”！
+      // 绝对不能把包含图片 URL 的整个 localData 发过去，会被宝塔入侵检测当成黑客秒杀！
+      // 我们只挑 AI 认识的纯净文本数据发过去：
+      const cleanQuoteData = {
+        product_name: localData.product_name,
+        bom: editableBom, // 发送当前表格里的最新明细
+        final_price: calculatedTotal,
+        analysis_reasoning: localData.analysis_reasoning
+      };
+
       const res = await fetch("https://api.toughlove.online/api/fix_quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           inquiry_id: localData.id,
-          old_quote: localData, // 把旧数据传过去
-          user_note: aiNote   // 业务员的吐槽指令
+          old_quote: cleanQuoteData, // 👈 只发送洗干净的纯文本对象
+          user_note: aiNote
         }),
       });
 
@@ -116,8 +126,8 @@ Best regards,
       const result = await res.json();
       const newData = result.new_data;
       
-      // 1. 用 AI 返回的最新数据覆盖本地状态
-      setLocalData(newData);
+      // 1. 用 AI 返回的最新数据覆盖本地状态 (保留 localData 原有的图片链接等属性)
+      setLocalData({ ...localData, ...newData });
       setEditableBom(newData.bom || []);
       
       // 2. 重新计算溢价
@@ -131,7 +141,7 @@ Best regards,
       
       // 3. 触发列表更新
       if (onSave) {
-        onSave({ ...newData, final_price: aiFinalPrice, margin: initialMargin });
+        onSave({ ...localData, ...newData, final_price: aiFinalPrice, margin: initialMargin });
       }
       
     } catch (error) {
