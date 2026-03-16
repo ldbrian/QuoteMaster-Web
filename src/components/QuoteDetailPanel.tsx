@@ -171,7 +171,7 @@ Best regards,
                 title="导出为 PDF 报价单"
               >
                 <Download className="w-4 h-4" />
-                导出
+                导出报价单
               </button>
               <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition">
                 <X className="w-5 h-5" />
