@@ -151,7 +151,7 @@ Best regards,
   return (
     <>
       <div className="fixed inset-0 z-40 flex justify-end bg-black/40 backdrop-blur-sm transition-opacity">
-        <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
+        <div className="w-full max-w-xl bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
           {/* Header区 */}
           <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
             <div>
@@ -164,7 +164,7 @@ Best regards,
               </p>
             </div>
             {/* 🌟 增加右上角快捷导出按钮 */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button 
                 onClick={() => setIsExportOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition shadow-sm"
@@ -313,7 +313,7 @@ Best regards,
           </div>
 
           {/* 底部汇总区 */}
-          <div className="border-t border-gray-200 bg-gray-50 p-6 shrink-0">
+          <div className="border-t border-gray-200 bg-gray-50 p-6 pr-16 shrink-0 relative">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">最终预估 FOB 价</p>
