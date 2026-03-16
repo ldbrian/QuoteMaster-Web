@@ -15,6 +15,7 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
   const [styleNo, setStyleNo] = useState('');
   const [validDays, setValidDays] = useState('30');
   const [remarks, setRemarks] = useState('');
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   // 引用预览区域，用于导出 PDF
   const previewRef = useRef<HTMLDivElement>(null);
@@ -27,40 +28,77 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
   validUntilDate.setDate(validUntilDate.getDate() + parseInt(validDays));
   const validUntil = validUntilDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
-  // 🚀 接入真实的 PDF 导出引擎
+  // 🚀 1. 真正的 PDF 导出引擎（解决卡死问题）
   const handleExportPDF = async () => {
-    if (!previewRef.current) {
-      alert("预览区域未加载，无法导出！");
-      return;
-    }
+    if (!previewRef.current) return;
+    
+    // 开启 Loading 状态，防止重复点击
+    setIsExportingPDF(true);
 
-    try {
-      // 动态引入 html2pdf，完美避开 Next.js 的 SSR 报错坑
-      const html2pdf = (await import('html2pdf.js')).default;
-      
-      const element = previewRef.current;
-      
-      // 配置 PDF 参数，确保 A4 尺寸和高清画质
-      const opt = {
-        margin:       0,
-        filename:     `Quotation_${styleNo || 'QM_Quote'}.pdf`,
-        image:        { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
-      };
+    // 🌟 核心修复：用 setTimeout 把繁重的渲染任务推迟一帧，让 React 有时间把 Loading 动画渲染出来，避免假死！
+    setTimeout(async () => {
+      try {
+        const html2pdfModule = await import('html2pdf.js');
+        const html2pdf = html2pdfModule.default || html2pdfModule;
+        
+        const element = previewRef.current;
+        if (!element) return;
+        const opt = {
+          margin:       0,
+          filename:     `Quotation_${styleNo || 'QM_Quote'}.pdf`,
+          image:        { type: 'jpeg' as const, quality: 0.98 },
+          // 将 scale 降为 1 减轻浏览器计算压力，提升速度
+          html2canvas:  { scale: 1, useCORS: true, logging: false }, 
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+        };
 
-      // 生成并下载 PDF
-      html2pdf().set(opt).from(element).save();
-      
-    } catch (error) {
-      console.error("PDF 导出失败:", error);
-      alert("导出失败，请检查网络或控制台日志。");
-    }
+        // 加上 await，等彻底生成完再关掉 Loading
+        await html2pdf().set(opt).from(element).save();
+      } catch (error) {
+        console.error("PDF 导出失败:", error);
+        alert("导出遇到问题，请重试。");
+      } finally {
+        setIsExportingPDF(false); // 关闭 Loading
+      }
+    }, 100); 
   };
 
-  // 预留的 Excel 导出接口（待开发）
-  const handleExportExcel = () => {
-    alert("📊 导出 Excel 核心逻辑准备就绪！我们将在下一步接入 xlsx 库生成真实的电子表格。");
+  // 📊 2. 真正的 Excel 导出引擎（消灭假闭环）
+  const handleExportExcel = async () => {
+    try {
+      // 动态加载 xlsx 库
+      const XLSX = await import('xlsx');
+      
+      // 组装要写入 Excel 的数据
+      const excelData = (quoteData.bom || []).map((item: any) => ({
+        "项目明细 (Description)": item.item || item.name,
+        "预估单价 (Unit Price USD)": Number(item.cost).toFixed(2)
+      }));
+      
+      // 如果有利润/杂费，加在倒数第二行
+      if (quoteData.margin > 0) {
+        excelData.push({
+          "项目明细 (Description)": "Premium / Risk Buffer",
+          "预估单价 (Unit Price USD)": Number(quoteData.margin).toFixed(2)
+        });
+      }
+      
+      // 最后一行加上总价
+      excelData.push({
+        "项目明细 (Description)": "TOTAL FOB PRICE",
+        "预估单价 (Unit Price USD)": Number(quoteData.final_price).toFixed(2)
+      });
+
+      // 生成工作簿并下载
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Quotation");
+      
+      XLSX.writeFile(workbook, `Quotation_${styleNo || 'QM_Quote'}.xlsx`);
+    } catch (error) {
+      console.error("Excel 导出失败:", error);
+      alert("Excel 生成失败，请检查依赖是否正确安装。");
+    }
   };
 
   return (
@@ -127,8 +165,18 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
           </div>
 
           <div className="p-6 bg-white border-t border-slate-200 space-y-3 shrink-0">
-            <button onClick={handleExportPDF} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg flex justify-center items-center gap-2 shadow-sm transition-colors">
-              <FileText className="w-4 h-4" /> 导出精美 PDF
+            <button 
+              onClick={handleExportPDF} 
+              disabled={isExportingPDF}
+              className={`w-full text-white font-medium py-2.5 rounded-lg flex justify-center items-center gap-2 shadow-sm transition-colors ${
+                isExportingPDF ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+            >
+              {isExportingPDF ? (
+                <>正在渲染高清文件，请稍候...</>
+              ) : (
+                <><FileText className="w-4 h-4" /> 导出精美 PDF</>
+              )}
             </button>
             <button onClick={handleExportExcel} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-lg flex justify-center items-center gap-2 shadow-sm transition-colors">
               <FileSpreadsheet className="w-4 h-4" /> 导出可编辑 Excel
