@@ -47,8 +47,20 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
           margin:       0,
           filename:     `Quotation_${styleNo || 'QM_Quote'}.pdf`,
           image:        { type: 'jpeg' as const, quality: 0.98 },
-          // 将 scale 降为 1 减轻浏览器计算压力，提升速度
-          html2canvas:  { scale: 1, useCORS: true, logging: false }, 
+          html2canvas:  { 
+            scale: 2, // 恢复 2 倍高清画质
+            useCORS: true, 
+            logging: false,
+            // 🌟 核心修复：在截图瞬间，强制清除克隆 DOM 的阴影，彻底消灭 lab() 颜色崩溃源
+            onclone: (clonedDoc: Document) => {
+              const elements = clonedDoc.getElementsByTagName('*');
+              for (let i = 0; i < elements.length; i++) {
+                const el = elements[i] as HTMLElement;
+                el.style.boxShadow = 'none';
+                el.style.filter = 'none';
+              }
+            }
+          }, 
           jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
         };
 
@@ -191,6 +203,7 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
           </button>
           
           <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center">
+            <div className="shadow-2xl h-fit"></div>
             {/* A4 纸张容器 */}
             <div 
               ref={previewRef}
