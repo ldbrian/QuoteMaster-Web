@@ -13,6 +13,7 @@
     "autoprefixer": "^10.4.24",
     "browser-image-compression": "^2.0.2",
     "clsx": "^2.1.1",
+    "html2pdf.js": "^0.14.0",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "postcss": "^8.5.6",

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { X, Edit2, Save, AlertCircle, DollarSign, Calculator, FileText, MessageSquareQuote, Loader2, Send } from "lucide-react";
+import { X, Edit2, Save, AlertCircle, DollarSign, Calculator, FileText, MessageSquareQuote, Loader2, Send, Download } from "lucide-react";
+import ExportPreviewModal from './ExportPreviewModal'; // 🌟 引入导出装配台组件
 
 interface BOMItem {
   id?: string;
@@ -43,6 +44,9 @@ export default function QuoteDetailPanel({
   // 🌟 AI 纠错专用的状态
   const [aiNote, setAiNote] = useState('');
   const [isAiFixing, setIsAiFixing] = useState(false);
+
+  // 🌟 导出装配台状态
+  const [isExportOpen, setIsExportOpen] = useState(false);
 
   useEffect(() => {
     if (quoteData && isOpen) {
@@ -116,7 +120,7 @@ Best regards,
       const result = await res.json();
       const newData = result.new_data;
       
-      // 1. 用 AI 返回的最新数据覆盖本地状态 (保留 localData 原有的图片链接等属性)
+      // 1. 用 AI 返回的最新数据覆盖本地状态
       setLocalData({ ...localData, ...newData });
       setEditableBom(newData.bom || []);
       
@@ -145,183 +149,207 @@ Best regards,
   if (!isOpen || !localData) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm transition-opacity">
-      <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
-        {/* Header区 */}
-        <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-blue-600" />
-              AI 智能核价单
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {localData.product_name || "系统客观拆解，支持人工微调"}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* 内容区 */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          
-          {/* 🌟 核心改动：把纠错框无缝融合到了 AI 依据下面 */}
-          {localData.analysis_reasoning && (
-            <div className="bg-blue-50/50 border border-blue-200 rounded-xl p-4 shadow-sm">
-              <h3 className="text-sm font-bold text-blue-800 flex items-center gap-1.5 mb-2">
-                <FileText className="w-4 h-4" /> AI 核价依据
-              </h3>
-              <p className="text-sm text-blue-700 leading-relaxed whitespace-pre-wrap mb-4">
-                {localData.analysis_reasoning}
+    <>
+      <div className="fixed inset-0 z-40 flex justify-end bg-black/40 backdrop-blur-sm transition-opacity">
+        <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
+          {/* Header区 */}
+          <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div>
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-blue-600" />
+                AI 智能核价单
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {localData.product_name || "系统客观拆解，支持人工微调"}
               </p>
-              
-              {/* 🛠️ AI 纠错重算模块 */}
-              <div className="border-t border-blue-200/60 pt-3 mt-2">
-                <label className="flex items-center gap-1.5 text-[11px] font-bold text-blue-800 mb-2 uppercase tracking-wider">
-                  <AlertCircle className="w-3.5 h-3.5" /> 发现 AI 算错了？输入反馈让它重算
-                </label>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    value={aiNote}
-                    onChange={(e) => setAiNote(e.target.value)}
-                    placeholder="例如：亮片只有50个左右..."
-                    className="flex-1 px-3 py-2 rounded-md border border-blue-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-800 placeholder:text-gray-400"
-                    onKeyDown={(e) => e.key === 'Enter' && handleAiFix()}
-                  />
-                  <button 
-                    onClick={handleAiFix}
-                    disabled={isAiFixing || !aiNote.trim()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-md flex items-center justify-center transition-colors disabled:opacity-50 disabled:bg-blue-400"
-                  >
-                    {isAiFixing ? <Loader2 className="w-4 h-4 animate-spin" /> : '重算'}
-                  </button>
+            </div>
+            {/* 🌟 增加右上角快捷导出按钮 */}
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setIsExportOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition shadow-sm"
+                title="导出为 PDF 报价单"
+              >
+                <Download className="w-4 h-4" />
+                导出
+              </button>
+              <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* 内容区 */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            
+            {/* AI 纠错重算模块 */}
+            {localData.analysis_reasoning && (
+              <div className="bg-blue-50/50 border border-blue-200 rounded-xl p-4 shadow-sm">
+                <h3 className="text-sm font-bold text-blue-800 flex items-center gap-1.5 mb-2">
+                  <FileText className="w-4 h-4" /> AI 核价依据
+                </h3>
+                <p className="text-sm text-blue-700 leading-relaxed whitespace-pre-wrap mb-4">
+                  {localData.analysis_reasoning}
+                </p>
+                
+                <div className="border-t border-blue-200/60 pt-3 mt-2">
+                  <label className="flex items-center gap-1.5 text-[11px] font-bold text-blue-800 mb-2 uppercase tracking-wider">
+                    <AlertCircle className="w-3.5 h-3.5" /> 发现 AI 算错了？输入反馈让它重算
+                  </label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={aiNote}
+                      onChange={(e) => setAiNote(e.target.value)}
+                      placeholder="例如：亮片只有50个左右..."
+                      className="flex-1 px-3 py-2 rounded-md border border-blue-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-800 placeholder:text-gray-400"
+                      onKeyDown={(e) => e.key === 'Enter' && handleAiFix()}
+                    />
+                    <button 
+                      onClick={handleAiFix}
+                      disabled={isAiFixing || !aiNote.trim()}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-md flex items-center justify-center transition-colors disabled:opacity-50 disabled:bg-blue-400"
+                    >
+                      {isAiFixing ? <Loader2 className="w-4 h-4 animate-spin" /> : '重算'}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* 表格区 */}
-          <div>
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">
-                BOM 成本明细 (USD)
-              </h3>
-              {!isEditing ? (
-                <button onClick={() => setIsEditing(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition">
-                  <Edit2 className="w-4 h-4" /> 人工微调
-                </button>
-              ) : (
-                <button onClick={handleSaveClick} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition shadow-sm">
-                  <Save className="w-4 h-4" /> 保存锁定
-                </button>
-              )}
-            </div>
-            
-            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-              <table className="w-full text-left text-sm text-gray-600">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">项目 (Item)</th>
-                    <th className="px-4 py-3 font-medium text-right">预估单价 ($)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {editableBom.map((item, index) => (
-                    <tr key={index} className="hover:bg-gray-50/50 transition">
+            {/* 表格区 */}
+            <div>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">
+                  BOM 成本明细 (USD)
+                </h3>
+                {!isEditing ? (
+                  <button onClick={() => setIsEditing(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition">
+                    <Edit2 className="w-4 h-4" /> 人工微调
+                  </button>
+                ) : (
+                  <button onClick={handleSaveClick} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition shadow-sm">
+                    <Save className="w-4 h-4" /> 保存锁定
+                  </button>
+                )}
+              </div>
+              
+              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                <table className="w-full text-left text-sm text-gray-600">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">项目 (Item)</th>
+                      <th className="px-4 py-3 font-medium text-right">预估单价 ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {editableBom.map((item, index) => (
+                      <tr key={index} className="hover:bg-gray-50/50 transition">
+                        <td className="px-4 py-3">
+                          <span className="font-medium text-gray-800">{item.item || item.name}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.cost === 0 ? "" : item.cost}
+                              onChange={(e) => handleCostChange(index, e.target.value)}
+                              className="w-24 text-right border border-blue-300 rounded-md px-2 py-1 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="0.00"
+                            />
+                          ) : (
+                            <span className="font-mono">${Number(item.cost).toFixed(2)}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+
+                    <tr className="bg-orange-50/30">
                       <td className="px-4 py-3">
-                        <span className="font-medium text-gray-800">{item.item || item.name}</span>
+                        <span className="font-medium text-orange-700 flex items-center gap-1.5">
+                          <AlertCircle className="w-4 h-4" /> 弹性溢价 / 风险预留
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         {isEditing ? (
                           <input
                             type="number"
                             step="0.01"
-                            value={item.cost === 0 ? "" : item.cost}
-                            onChange={(e) => handleCostChange(index, e.target.value)}
-                            className="w-24 text-right border border-blue-300 rounded-md px-2 py-1 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={margin === 0 ? "" : margin}
+                            onChange={(e) => setMargin(e.target.value === "" ? 0 : parseFloat(e.target.value))}
+                            className="w-24 text-right border border-orange-300 bg-white rounded-md px-2 py-1 text-orange-800 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500"
                             placeholder="0.00"
                           />
                         ) : (
-                          <span className="font-mono">${Number(item.cost).toFixed(2)}</span>
+                          <span className="font-mono font-semibold text-orange-600">
+                            + ${Number(margin).toFixed(2)}
+                          </span>
                         )}
                       </td>
                     </tr>
-                  ))}
-
-                  <tr className="bg-orange-50/30">
-                    <td className="px-4 py-3">
-                      <span className="font-medium text-orange-700 flex items-center gap-1.5">
-                        <AlertCircle className="w-4 h-4" /> 弹性溢价 / 风险预留
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={margin === 0 ? "" : margin}
-                          onChange={(e) => setMargin(e.target.value === "" ? 0 : parseFloat(e.target.value))}
-                          className="w-24 text-right border border-orange-300 bg-white rounded-md px-2 py-1 text-orange-800 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500"
-                          placeholder="0.00"
-                        />
-                      ) : (
-                        <span className="font-mono font-semibold text-orange-600">
-                          + ${Number(margin).toFixed(2)}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            <div>
+              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                <MessageSquareQuote className="w-4 h-4" /> 推荐回复话术 (草稿)
+              </h3>
+              <textarea 
+                readOnly
+                className="w-full text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-xl p-4 min-h-[160px] focus:outline-none"
+                value={generatedPitch}
+              />
+              <button 
+                onClick={() => navigator.clipboard.writeText(generatedPitch)}
+                className="text-xs text-blue-600 font-medium mt-2 hover:underline px-1"
+              >
+                一键复制话术
+              </button>
+            </div>
+
           </div>
 
-          <div>
-            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5 mb-3">
-              <MessageSquareQuote className="w-4 h-4" /> 推荐回复话术 (草稿)
-            </h3>
-            <textarea 
-              readOnly
-              className="w-full text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-xl p-4 min-h-[160px] focus:outline-none"
-              value={generatedPitch}
-            />
+          {/* 底部汇总区 */}
+          <div className="border-t border-gray-200 bg-gray-50 p-6 shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">最终预估 FOB 价</p>
+                <p className="text-xs text-gray-400 mt-1">包含硬成本与弹性溢价</p>
+              </div>
+              <div className="flex items-end gap-1 text-blue-600">
+                <DollarSign className="w-6 h-6 mb-1" />
+                <span className="text-4xl font-bold tracking-tight font-mono">
+                  {calculatedTotal.toFixed(2)}
+                </span>
+              </div>
+            </div>
+            
+            {/* 🌟 修改底部按钮：点击唤起导出装配台 */}
             <button 
-              onClick={() => navigator.clipboard.writeText(generatedPitch)}
-              className="text-xs text-blue-600 font-medium mt-2 hover:underline px-1"
+              onClick={() => setIsExportOpen(true)}
+              className="w-full mt-6 bg-gray-900 text-white font-medium py-3 rounded-lg hover:bg-gray-800 transition shadow-md flex justify-center items-center gap-2"
             >
-              一键复制话术
+              <Download className="w-5 h-5" />
+              确认并生成正式报价单
             </button>
           </div>
-
-        </div>
-
-        {/* 底部汇总区 */}
-        <div className="border-t border-gray-200 bg-gray-50 p-6 shrink-0">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">最终预估 FOB 价</p>
-              <p className="text-xs text-gray-400 mt-1">包含硬成本与弹性溢价</p>
-            </div>
-            <div className="flex items-end gap-1 text-blue-600">
-              <DollarSign className="w-6 h-6 mb-1" />
-              <span className="text-4xl font-bold tracking-tight font-mono">
-                {calculatedTotal.toFixed(2)}
-              </span>
-            </div>
-          </div>
-          
-          <button 
-            onClick={() => {
-              alert("🚧 【新功能内测中】\n\n一键生成带公司 Logo 的精美 PDF 报价单功能正在紧张开发中！\n\n如果您需要此功能，请通过页面右下角的【吐槽反馈】告诉我们，我们会为您优先排期上线！");
-            }}
-            className="w-full mt-6 bg-gray-900 text-white font-medium py-3 rounded-lg hover:bg-gray-800 transition shadow-md flex justify-center items-center gap-2"
-          >
-            确认并生成正式报价单
-          </button>
         </div>
       </div>
-    </div>
+
+      {/* 🌟 挂载导出装配台组件，传入最新计算的数值 */}
+      <ExportPreviewModal 
+        isOpen={isExportOpen} 
+        onClose={() => setIsExportOpen(false)} 
+        quoteData={{
+          ...localData,
+          bom: editableBom,
+          margin: margin,
+          final_price: calculatedTotal
+        }} 
+      />
+    </>
   );
 }
