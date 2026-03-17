@@ -16,6 +16,7 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
   const [validDays, setValidDays] = useState('30');
   const [remarks, setRemarks] = useState('');
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [hideBOM, setHideBOM] = useState(false);
 
   // 引用预览区域，用于导出 PDF
   const previewRef = useRef<HTMLDivElement>(null);
@@ -171,6 +172,21 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none"
               />
             </div>
+            {/* 🌟 新增：防底裤走光开关 */}
+            <div className="mt-4 p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl flex items-start gap-3 cursor-pointer" onClick={() => setHideBOM(!hideBOM)}>
+              <div className="mt-0.5">
+                <input 
+                  type="checkbox" 
+                  checked={hideBOM}
+                  readOnly
+                  className="w-4 h-4 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500 cursor-pointer"
+                />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-indigo-900">对外隐藏 BOM 成本明细</p>
+                <p className="text-xs text-indigo-700 mt-1 leading-relaxed">勾选后，导出的 PDF 将折叠各项材料人工费用，仅向客户展示最终 FOB 总价，完美保护您的利润空间。</p>
+              </div>
+            </div>
           </div>
 
           <div className="p-6 bg-white border-t border-slate-200 space-y-3 shrink-0">
@@ -245,20 +261,32 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
                       <th className="py-3 px-4 font-bold text-sm text-slate-700 text-right">Unit Price (USD)</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {quoteData.bom?.map((item: any, idx: number) => (
-                      <tr key={idx} className="border-b border-slate-100">
-                        <td className="py-3 px-4 text-sm text-slate-600">{item.item || item.name}</td>
-                        <td className="py-3 px-4 text-sm text-slate-800 font-mono text-right">${Number(item.cost).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                    {quoteData.margin > 0 && (
+                  {hideBOM ? (
+                    <tbody>
                       <tr className="border-b border-slate-100">
-                        <td className="py-3 px-4 text-sm text-slate-600">Premium / Risk Buffer</td>
-                        <td className="py-3 px-4 text-sm text-slate-800 font-mono text-right">${Number(quoteData.margin).toFixed(2)}</td>
+                        <td className="py-4 px-4 text-sm text-slate-600 italic">
+                          Product Manufacturing, Materials & Standard Packaging<br/>
+                          <span className="text-xs text-slate-400">(成品制造、材料与标准包装费用)</span>
+                        </td>
+                        <td className="py-4 px-4 text-sm text-slate-800 font-mono text-right text-opacity-50">Included</td>
                       </tr>
-                    )}
-                  </tbody>
+                    </tbody>
+                  ) : (
+                    <tbody>
+                      {quoteData.bom?.map((item: any, idx: number) => (
+                        <tr key={idx} className="border-b border-slate-100">
+                          <td className="py-3 px-4 text-sm text-slate-600">{item.item || item.name}</td>
+                          <td className="py-3 px-4 text-sm text-slate-800 font-mono text-right">${Number(item.cost).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                      {quoteData.margin > 0 && (
+                        <tr className="border-b border-slate-100">
+                          <td className="py-3 px-4 text-sm text-slate-600">Premium / Risk Buffer</td>
+                          <td className="py-3 px-4 text-sm text-slate-800 font-mono text-right">${Number(quoteData.margin).toFixed(2)}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  )}
                   <tfoot>
                     <tr className="border-b-2 border-slate-800">
                       <td className="py-4 px-4 font-black text-slate-900 text-right uppercase">Total FOB Price:</td>
