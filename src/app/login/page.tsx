@@ -19,7 +19,7 @@ export default function LoginPage() {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        alert('注册成功！请查看您的邮箱进行验证（如果有配置的话），或直接登录。');
+        alert('🎉 注册成功！请查收您的邮箱进行验证，或直接尝试登录。');
         setIsSignUp(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -27,7 +27,7 @@ export default function LoginPage() {
         router.push('/dashboard'); // 登录成功，跳转回 Dashboard
       }
     } catch (error: any) {
-      alert(error.message || '登录/注册失败，请重试');
+      alert(error.message || '登录/注册失败，请检查账号密码后重试');
     } finally {
       setLoading(false);
     }
@@ -47,16 +47,16 @@ export default function LoginPage() {
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 selection:bg-blue-100">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 border border-slate-100">
         
-        {/* Logo & Title */}
+        {/* Logo & 标题区 */}
         <div className="text-center mb-8">
           <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-blue-200 mx-auto mb-4">
             Q
           </div>
           <h2 className="text-2xl font-bold text-slate-900">
-            {isSignUp ? 'Create an Account' : 'Welcome to QuoteMaster'}
+            {isSignUp ? '创建 QuoteMaster 账号' : '欢迎登录 QuoteMaster'}
           </h2>
           <p className="text-slate-500 text-sm mt-2">
-            AI-Powered Smart Costing & Quoting System
+            AI 驱动的外贸智能核价与跟单系统
           </p>
         </div>
 
@@ -66,7 +66,7 @@ export default function LoginPage() {
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
-                type="email" required placeholder="Email Address"
+                type="email" required placeholder="请输入企业或常用邮箱"
                 value={email} onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
@@ -76,7 +76,7 @@ export default function LoginPage() {
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
-                type="password" required placeholder="Password"
+                type="password" required placeholder="请输入密码 (至少 6 位)"
                 value={password} onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
@@ -87,14 +87,14 @@ export default function LoginPage() {
             type="submit" disabled={loading}
             className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70"
           >
-            {loading ? <Loader2 className="animate-spin" size={18} /> : (isSignUp ? 'Sign Up' : 'Sign In')}
+            {loading ? <Loader2 className="animate-spin" size={18} /> : (isSignUp ? '立即注册' : '登录系统')}
             {!loading && <ArrowRight size={18} />}
           </button>
         </form>
 
         <div className="my-6 flex items-center gap-3">
           <div className="flex-1 h-px bg-slate-100"></div>
-          <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">OR</span>
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">或使用第三方账号</span>
           <div className="flex-1 h-px bg-slate-100"></div>
         </div>
 
@@ -109,13 +109,13 @@ export default function LoginPage() {
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
           </svg>
-          Continue with Google
+          使用 Google 账号继续
         </button>
 
         <div className="mt-8 text-center text-sm text-slate-500">
-          {isSignUp ? "Already have an account?" : "Don't have an account?"}{' '}
+          {isSignUp ? "已经有账号了？" : "还没有账号？"}{' '}
           <button onClick={() => setIsSignUp(!isSignUp)} className="text-blue-600 font-bold hover:underline">
-            {isSignUp ? 'Sign In' : 'Create one'}
+            {isSignUp ? '返回登录' : '立即免费注册'}
           </button>
         </div>
 
