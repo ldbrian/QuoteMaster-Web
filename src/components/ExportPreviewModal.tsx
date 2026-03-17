@@ -203,7 +203,7 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
           </button>
           
           <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center">
-            <div className="shadow-2xl h-fit"></div>
+            <div className="shadow-2xl h-fit">
             {/* A4 纸张容器 */}
             <div 
               ref={previewRef}
@@ -288,6 +288,7 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
                 </p>
               </div>
 
+            </div>
             </div>
           </div>
         </div>
