@@ -28,51 +28,48 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
   validUntilDate.setDate(validUntilDate.getDate() + parseInt(validDays));
   const validUntil = validUntilDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
-  // 🚀 1. 真正的 PDF 导出引擎（解决卡死问题）
+  // 🚀 1. 真正的现代 PDF 导出引擎（完美解决 lab() 颜色崩溃问题）
   const handleExportPDF = async () => {
     if (!previewRef.current) return;
     
-    // 开启 Loading 状态，防止重复点击
+    // 开启 Loading 状态
     setIsExportingPDF(true);
 
-    // 🌟 核心修复：用 setTimeout 把繁重的渲染任务推迟一帧，让 React 有时间把 Loading 动画渲染出来，避免假死！
-    setTimeout(async () => {
-      try {
-        const html2pdfModule = await import('html2pdf.js');
-        const html2pdf = html2pdfModule.default || html2pdfModule;
-        
-        const element = previewRef.current;
-        if (!element) return;
-        const opt = {
-          margin:       0,
-          filename:     `Quotation_${styleNo || 'QM_Quote'}.pdf`,
-          image:        { type: 'jpeg' as const, quality: 0.98 },
-          html2canvas:  { 
-            scale: 2, // 恢复 2 倍高清画质
-            useCORS: true, 
-            logging: false,
-            // 🌟 核心修复：在截图瞬间，强制清除克隆 DOM 的阴影，彻底消灭 lab() 颜色崩溃源
-            onclone: (clonedDoc: Document) => {
-              const elements = clonedDoc.getElementsByTagName('*');
-              for (let i = 0; i < elements.length; i++) {
-                const el = elements[i] as HTMLElement;
-                el.style.boxShadow = 'none';
-                el.style.filter = 'none';
-              }
-            }
-          }, 
-          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
-        };
+    try {
+      // 动态加载新引擎，完美兼容 Next.js SSR
+      const htmlToImage = await import('html-to-image');
+      const { jsPDF } = await import('jspdf');
+      
+      const element = previewRef.current;
+      
+      // 第 1 步：使用原生能力将 HTML 转为高清 PNG 图片 (无视任何复杂 CSS 颜色)
+      const dataUrl = await htmlToImage.toPng(element, {
+        quality: 0.98,
+        pixelRatio: 2, // 2倍高清画质
+        backgroundColor: '#ffffff' // 强制白底
+      });
 
-        // 加上 await，等彻底生成完再关掉 Loading
-        await html2pdf().set(opt).from(element).save();
-      } catch (error) {
-        console.error("PDF 导出失败:", error);
-        alert("导出遇到问题，请重试。");
-      } finally {
-        setIsExportingPDF(false); // 关闭 Loading
-      }
-    }, 100); 
+      // 第 2 步：创建一个标准的 A4 尺寸 PDF
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // 第 3 步：计算完美的等比缩放比例，贴合 A4 纸
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (element.offsetHeight * pdfWidth) / element.offsetWidth;
+
+      // 第 4 步：将高清图片贴入 PDF 并下载
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Quotation_${styleNo || 'QM_Quote'}.pdf`);
+      
+    } catch (error) {
+      console.error("PDF 导出崩溃:", error);
+      alert("导出遇到问题，请重试。");
+    } finally {
+      setIsExportingPDF(false); // 关闭 Loading
+    }
   };
 
   // 📊 2. 真正的 Excel 导出引擎（消灭假闭环）
