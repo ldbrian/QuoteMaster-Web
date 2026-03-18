@@ -396,6 +396,11 @@ export default function Dashboard() {
           setIsModalOpen(false);
           fetchLeads(); 
         }} 
+        // 🌟 CTO 级对接：接住从子组件传出来的演示数据！
+        onSelectDemo={(demoData) => {
+          setSelectedInquiryId(demoData.id || "demo-quote"); // 给个假 ID 骗过校验，让弹窗打开
+          setDetailData(demoData);                           // 把算好的极品假数据塞进去
+        }}
       />
       
       <QuoteDetailPanel 

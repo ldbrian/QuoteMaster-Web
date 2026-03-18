@@ -1,26 +1,93 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Upload, Loader2, FileImage, Trash2 } from 'lucide-react';
+import { X, Upload, Loader2, Trash2, Sparkles, PlayCircle } from 'lucide-react'; // 🌟 引入新图标
 import { supabase } from '@/src/utils/supabase/client'; 
 import imageCompression from 'browser-image-compression';
+
+// 🌟 核心机密：提前焊死的完美演示数据（放在组件外部，纯净加载）
+const DEMO_CASES = [
+  {
+    id: "demo-1",
+    title: "高定棒球帽",
+    image: "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=400&q=80",
+    quoteData: {
+      id: "demo-q-1",
+      product_name: "Premium Cotton Baseball Cap with 3D Embroidery",
+      analysis_reasoning: "通过图像分析：\n1. 材质为高克重纯棉斜纹布（约 10x10 纱支）。\n2. 正面包含高密度的 3D 立体刺绣 Logo。\n3. 配件包含定制金属调节扣及内里吸汗带。\n整体工艺属于中高端品质。",
+      moq: "1000",
+      bom: [
+        { name: "100% Cotton Twill Fabric (纯棉斜纹面料)", cost: 0.45 },
+        { name: "3D Logo Embroidery (正面立体刺绣)", cost: 0.35 },
+        { name: "Metal Buckle & Eyelets (金属调节扣与透气孔)", cost: 0.15 },
+        { name: "Inner Sweatband & Taping (内里吸汗带与包边)", cost: 0.20 },
+        { name: "Cut & Sew Labor (裁剪与车缝人工)", cost: 0.60 },
+        { name: "Standard Polybag & Carton (标准包装)", cost: 0.10 }
+      ],
+      margin: 0.45,
+      final_price: 2.30
+    }
+  },
+  {
+    id: "demo-2",
+    title: "不锈钢保温杯",
+    image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=400&q=80",
+    quoteData: {
+      id: "demo-q-2",
+      product_name: "500ml Stainless Steel Vacuum Flask with Silicone Sleeve",
+      analysis_reasoning: "通过图像分析：\n1. 杯身采用双层 304/316 不锈钢抽真空工艺。\n2. 表面处理为哑光喷塑。\n3. 底部与手握处配有定制开模的防滑硅胶套。\n此品类模具费用较高，需特别注意起订量。",
+      moq: "3000",
+      bom: [
+        { name: "304 Stainless Steel Inner & Outer (双层不锈钢杯身)", cost: 1.80 },
+        { name: "Vacuum Insulation Process (抽真空工艺费)", cost: 0.40 },
+        { name: "Powder Coating Finish (表面哑光喷塑)", cost: 0.35 },
+        { name: "Custom Silicone Sleeve (定制防滑硅胶套)", cost: 0.65 },
+        { name: "PP Lid with Rubber Seal (PP杯盖)", cost: 0.45 },
+        { name: "Assembly & Color Box (组装与彩盒包装)", cost: 0.35 }
+      ],
+      margin: 0.80,
+      final_price: 4.80
+    }
+  },
+  {
+    id: "demo-3",
+    title: "黄麻托特包",
+    image: "https://images.unsplash.com/photo-1597348989645-46b190ce4918?auto=format&fit=crop&w=400&q=80",
+    quoteData: {
+      id: "demo-q-3",
+      product_name: "Eco-friendly Jute Tote Bag with Cotton Handles",
+      analysis_reasoning: "通过图像分析：\n1. 主体面料为天然粗黄麻布（Jute），内里可能带有防水覆膜（PE Coating）。\n2. 提手为加厚纯棉织带，十字车缝加固。\n3. 正面有单色丝网印刷 Logo。\n属于典型的快消促销品，材料成本低，主要拼人工。",
+      moq: "5000",
+      bom: [
+        { name: "Natural Jute Fabric w/ PE Lamination (黄麻布含覆膜)", cost: 0.65 },
+        { name: "Cotton Webbing Handles (纯棉手提带)", cost: 0.25 },
+        { name: "1-Color Silkscreen Print (单色丝网印刷)", cost: 0.12 },
+        { name: "Sewing Labor (车缝人工)", cost: 0.35 },
+        { name: "Bulk Packing (大货捆扎包装)", cost: 0.08 }
+      ],
+      margin: 0.30,
+      final_price: 1.75
+    }
+  }
+];
 
 interface NewQuoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  // 🌟 新增一个 Prop：当用户点击演示时，把数据传给父组件
+  onSelectDemo?: (demoData: any) => void; 
 }
 
-const MAX_IMAGES = 4; // CTO 设定：最多 4 张
+const MAX_IMAGES = 4;
 
-export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteModalProps) {
+export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo }: NewQuoteModalProps) {
   const [files, setFiles] = useState<File[]>([]); 
   const [note, setNote] = useState('');
   const [uploading, setUploading] = useState(false);
 
   if (!isOpen) return null;
 
-  // 处理文件选择
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     if (files.length + selectedFiles.length > MAX_IMAGES) {
@@ -30,7 +97,6 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
     setFiles((prev) => [...prev, ...selectedFiles]);
   };
 
-  // 删除单张缩略图
   const removeFile = (indexToRemove: number) => {
     setFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
@@ -40,7 +106,6 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
     setUploading(true);
 
     try {
-      // 并发压缩多张图片
       const options = {
         maxSizeMB: 0.5, 
         maxWidthOrHeight: 1920, 
@@ -49,10 +114,8 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
         initialQuality: 0.8     
       };
       
-      console.log(`开始并发压缩 ${files.length} 张图片...`);
       const compressedFiles = await Promise.all(files.map(file => imageCompression(file, options)));
 
-      // 并发上传图片到 Supabase
       const uploadPromises = compressedFiles.map(async (compressedFile, index) => {
         const fileName = `${Date.now()}-${index}.jpg`;
         const { data, error } = await supabase.storage
@@ -69,9 +132,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
       });
 
       const imageUrls = await Promise.all(uploadPromises);
-      console.log('所有图片上传完毕，链接:', imageUrls);
 
-      // 在数据库创建新询盘
       const { data: newInquiry, error: dbError } = await supabase
         .from('inquiries')
         .insert({
@@ -86,7 +147,6 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
 
       if (dbError) throw dbError;
 
-      // 触发 Python 异步后台任务
       let res;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
@@ -104,7 +164,6 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
           throw new Error(`状态码异常: ${res.status}`);
         } catch (error) {
           if (attempt === 3) throw error; 
-          console.warn(`⚠️ 网络闪断 (尝试 ${attempt}/3)，0.5秒后静默重试...`);
           await new Promise(resolve => setTimeout(resolve, 500)); 
         }
       }
@@ -122,25 +181,24 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
           <h3 className="font-bold text-slate-800">新建 AI 多图核价</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X size={20} />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-6 space-y-4">
+        {/* Body (可滚动区域) */}
+        <div className="p-6 overflow-y-auto space-y-5">
           
           {/* 多图上传区 */}
-          <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-50 hover:border-blue-400 transition-all min-h-[160px]">
+          <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-50 hover:border-blue-400 transition-all min-h-[140px]">
             {files.length > 0 ? (
               <div className="w-full">
-                {/* 缩略图网格 */}
                 <div className="grid grid-cols-4 gap-3 mb-4">
                   {files.map((file, index) => (
                     <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 shadow-sm">
@@ -153,7 +211,6 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
                       </button>
                     </div>
                   ))}
-                  {/* 继续添加按钮 */}
                   {files.length < MAX_IMAGES && (
                     <label className="aspect-square rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 text-slate-400 transition-colors">
                       <Upload size={20} />
@@ -164,30 +221,15 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
                 <p className="text-xs text-center text-slate-500">已选择 {files.length}/{MAX_IMAGES} 张图片</p>
               </div>
             ) : (
-              <label className="flex flex-col items-center cursor-pointer w-full py-6">
-                <div className="w-12 h-12 bg-white shadow-sm rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+              <label className="flex flex-col items-center cursor-pointer w-full py-4">
+                <div className="w-10 h-10 bg-white shadow-sm rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                   <Upload size={20} className="text-blue-500" />
                 </div>
                 <p className="text-sm font-medium text-slate-600">点击上传产品多视图</p>
-                <p className="text-xs text-slate-400 mt-1">支持正反面、细节图 (最多 {MAX_IMAGES} 张)</p>
+                <p className="text-xs text-slate-400 mt-1">支持细节图 (最多 {MAX_IMAGES} 张)</p>
                 <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
               </label>
             )}
-          </div>
-
-          {/* 🌟 补回来的：AI Supported Categories Prompt */}
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed shadow-sm">
-            <p className="font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-              💡 AI 智能核价支持品类：
-            </p>
-            <ul className="list-disc list-inside ml-1 text-slate-500 space-y-1 text-xs">
-              <li><strong className="text-slate-600">服装：</strong>T恤、卫衣、外套、长短裤、裙装等</li>
-              <li><strong className="text-slate-600">箱包：</strong>帆布袋、托特包、背包等</li>
-              <li><strong className="text-slate-600">帽类与配饰：</strong>棒球帽、针织帽、围巾、手套等</li>
-            </ul>
-            <p className="mt-2 text-[11px] text-slate-400 italic leading-tight">
-              * 注：暂不支持五金、电子、注塑等非柔性制造品类的精准核价。
-            </p>
           </div>
 
           {/* 需求输入框 */}
@@ -196,8 +238,8 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
             <textarea 
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="例如：请综合分析正面图案和背面刺绣，核算综合成本..."
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none min-h-[100px] resize-none"
+              placeholder="例如：请综合分析正面图案和背面刺绣..."
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none min-h-[80px] resize-none"
             />
           </div>
 
@@ -208,6 +250,41 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess }: NewQuoteMo
           >
             {uploading ? <Loader2 className="animate-spin" size={20} /> : '开始 AI 综合核价'}
           </button>
+
+          {/* 🌟 核心杀招：Aha Moment 横向滑动演示区 */}
+          <div className="pt-4 mt-2 border-t border-slate-100">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <p className="text-sm font-bold text-slate-700">没图片？点这里体验极速秒算</p>
+            </div>
+            
+            {/* 横向滚动容器，隐藏滚动条 */}
+            <div className="flex overflow-x-auto gap-3 pb-2 snap-x" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {DEMO_CASES.map((demo) => (
+                <div 
+                  key={demo.id} 
+                  onClick={() => {
+                    if (onSelectDemo) {
+                      onSelectDemo(demo.quoteData);
+                      onClose(); // 点完自动关闭上传弹窗
+                    }
+                  }}
+                  className="shrink-0 w-[140px] group relative rounded-xl overflow-hidden cursor-pointer snap-start border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all bg-slate-50"
+                >
+                  <div className="h-[90px] overflow-hidden relative">
+                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors z-10 flex items-center justify-center">
+                      <PlayCircle className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
+                    </div>
+                    <img src={demo.image} alt={demo.title} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="p-2 text-center">
+                    <p className="text-xs font-bold text-slate-800 truncate">{demo.title}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
         </div>
       </div>
     </div>
