@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { X, Edit2, Save, AlertCircle, DollarSign, Calculator, FileText, MessageSquareQuote, Loader2, Send, Download } from "lucide-react";
-import ExportPreviewModal from './ExportPreviewModal'; // 🌟 引入导出装配台组件
+import { X, Edit2, Save, AlertCircle, DollarSign, Calculator, FileText, MessageSquareQuote, Loader2, Send, Download, ShieldAlert } from "lucide-react";
+import ExportPreviewModal from './ExportPreviewModal'; 
 
 interface BOMItem {
   id?: string;
@@ -19,6 +19,8 @@ interface QuoteData {
   total_cost?: number;
   bom?: BOMItem[];
   analysis_reasoning?: string; 
+  margin?: number;
+  moq?: string | number; // 🌟 新增 MOQ 字段
 }
 
 interface QuoteDetailPanelProps {
@@ -34,18 +36,17 @@ export default function QuoteDetailPanel({
   quoteData,
   onSave,
 }: QuoteDetailPanelProps) {
-  // 🌟 接管全局状态，方便 AI 纠错后覆盖
   const [localData, setLocalData] = useState<QuoteData | null>(null);
   
   const [isEditing, setIsEditing] = useState(false);
   const [editableBom, setEditableBom] = useState<BOMItem[]>([]);
   const [margin, setMargin] = useState<number>(0);
   
-  // 🌟 AI 纠错专用的状态
+  // 🌟 新增：MOQ 状态管理，默认给个 500 的心理暗示
+  const [moq, setMoq] = useState<string>("500");
+
   const [aiNote, setAiNote] = useState('');
   const [isAiFixing, setIsAiFixing] = useState(false);
-
-  // 🌟 导出装配台状态
   const [isExportOpen, setIsExportOpen] = useState(false);
 
   useEffect(() => {
@@ -53,6 +54,8 @@ export default function QuoteDetailPanel({
       setLocalData(quoteData); 
       setEditableBom(JSON.parse(JSON.stringify(quoteData.bom || [])));
       setIsEditing(false);
+      // 如果之前保存过 moq，回显它
+      if (quoteData.moq) setMoq(String(quoteData.moq));
       
       const bomTotal = (quoteData.bom || []).reduce((sum, i) => sum + (Number(i.cost) || 0), 0);
       const aiFinalPrice = quoteData.final_price || quoteData.total_cost || 0;
@@ -67,18 +70,21 @@ export default function QuoteDetailPanel({
     return bomTotal + (Number(margin) || 0);
   }, [editableBom, margin]);
 
+  // 🌟 升级：把 MOQ 和 ±15% 免责声明直接写进话术里！
   const generatedPitch = useMemo(() => {
     const productName = localData?.product_name || "the requested item";
     const price = calculatedTotal.toFixed(2);
+    const moqText = moq ? ` based on a MOQ of ${moq} pcs` : "";
+    
     return `Dear Client,
 
-Thank you for your inquiry. Based on the reference image and your requirements, we are pleased to offer our best FOB Shanghai price for ${productName} at $${price}/pc.
+Thank you for your inquiry. Based on the reference image and your requirements, we are pleased to offer our best estimated FOB price for ${productName} at $${price}/pc${moqText}.
 
-This price includes premium materials and standard packaging. Please let me know if you need physical samples or have further modifications.
+Please note this is an estimated quote (±15% variance) based on image analysis. Final price is subject to physical sample confirmation. Let me know if you need to proceed with sampling.
 
 Best regards,
 [Your Name]`;
-  }, [calculatedTotal, localData?.product_name]);
+  }, [calculatedTotal, localData?.product_name, moq]);
 
   const handleCostChange = (index: number, newCost: string) => {
     const updatedBom = [...editableBom];
@@ -94,11 +100,11 @@ Best regards,
         bom: editableBom,
         final_price: calculatedTotal,
         margin: margin,
+        moq: moq, // 🌟 保存时带上 MOQ
       });
     }
   };
 
-  // 🤖 AI 一键纠错重算（小白纠偏模式）
   const handleAiFix = async () => {
     if (!aiNote.trim()) return alert('请告诉 AI 哪里算错了？例如：亮片只有50个');
     if (!localData?.id) return alert('找不到订单ID，无法重算');
@@ -106,13 +112,12 @@ Best regards,
     setIsAiFixing(true);
 
     try {
-      // 🛡️ CTO 级架构升级：前端不再发送庞大的 JSON 给防火墙扫描，只发极其干净的 ID 和一句指令！
       const res = await fetch("https://api.toughlove.online/api/fix_quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           inquiry_id: localData.id,
-          user_note: aiNote   // 只有一句话，Nginx 绝对秒放行
+          user_note: aiNote 
         }),
       });
 
@@ -120,22 +125,19 @@ Best regards,
       const result = await res.json();
       const newData = result.new_data;
       
-      // 1. 用 AI 返回的最新数据覆盖本地状态
       setLocalData({ ...localData, ...newData });
       setEditableBom(newData.bom || []);
       
-      // 2. 重新计算溢价
       const newBomTotal = (newData.bom || []).reduce((sum: number, i: any) => sum + (Number(i.cost) || 0), 0);
       const aiFinalPrice = newData.final_price || newData.total_cost || 0;
       const initialMargin = aiFinalPrice > newBomTotal ? (aiFinalPrice - newBomTotal) : 0;
       setMargin(Number(initialMargin.toFixed(2)));
 
-      setAiNote(''); // 清空输入框
+      setAiNote(''); 
       alert('🎉 AI 纠错成功，已自动更新 BOM 成本与总价！');
       
-      // 3. 触发列表更新
       if (onSave) {
-        onSave({ ...localData, ...newData, final_price: aiFinalPrice, margin: initialMargin });
+        onSave({ ...localData, ...newData, final_price: aiFinalPrice, margin: initialMargin, moq: moq });
       }
       
     } catch (error) {
@@ -163,7 +165,6 @@ Best regards,
                 {localData.product_name || "系统客观拆解，支持人工微调"}
               </p>
             </div>
-            {/* 🌟 增加右上角快捷导出按钮 */}
             <div className="flex items-center gap-2 shrink-0">
               <button 
                 onClick={() => setIsExportOpen(true)}
@@ -313,24 +314,53 @@ Best regards,
           </div>
 
           {/* 底部汇总区 */}
-          <div className="border-t border-gray-200 bg-gray-50 p-6 pr-16 shrink-0 relative">
+          <div className="border-t border-gray-200 bg-gray-50 p-6 shrink-0 relative">
+            
+            {/* 🌟 核心升级：MOQ 交互区，紧贴在总价上方 */}
+            <div className="mb-4 pb-4 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                  最小起订量 (MOQ)
+                </label>
+                <p className="text-xs text-gray-500 mt-0.5">报价需基于起订量，避免后续扯皮</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={moq}
+                  onChange={(e) => setMoq(e.target.value)}
+                  placeholder="500"
+                  className="w-24 text-right border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                />
+                <span className="text-sm text-gray-600 font-medium w-8">pcs</span>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">最终预估 FOB 价</p>
-                <p className="text-xs text-gray-400 mt-1">包含硬成本与弹性溢价</p>
+                {/* 🌟 核心升级：±15% 价格安全区间展示 */}
+                <div className="flex items-center gap-1 mt-1.5 bg-blue-100/60 text-blue-700 px-2.5 py-1 rounded border border-blue-200/50">
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <p className="text-xs font-semibold">
+                    安全预估区间: ${(calculatedTotal * 0.85).toFixed(2)} - ${(calculatedTotal * 1.15).toFixed(2)}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-end gap-1 text-blue-600">
-                <DollarSign className="w-6 h-6 mb-1" />
-                <span className="text-4xl font-bold tracking-tight font-mono">
-                  {calculatedTotal.toFixed(2)}
-                </span>
+              <div className="flex flex-col items-end">
+                <div className="flex items-end gap-1 text-blue-600">
+                  <DollarSign className="w-5 h-5 mb-1" />
+                  <span className="text-4xl font-bold tracking-tight font-mono">
+                    {calculatedTotal.toFixed(2)}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-400 mt-1">/ pc</span>
               </div>
             </div>
             
-            {/* 🌟 修改底部按钮：点击唤起导出装配台 */}
             <button 
               onClick={() => setIsExportOpen(true)}
-              className="w-full mt-6 bg-gray-900 text-white font-medium py-3 rounded-lg hover:bg-gray-800 transition shadow-md flex justify-center items-center gap-2"
+              className="w-full mt-5 bg-gray-900 text-white font-medium py-3 rounded-lg hover:bg-gray-800 transition shadow-md flex justify-center items-center gap-2"
             >
               <Download className="w-5 h-5" />
               确认并生成正式报价单
@@ -339,7 +369,6 @@ Best regards,
         </div>
       </div>
 
-      {/* 🌟 挂载导出装配台组件，传入最新计算的数值 */}
       <ExportPreviewModal 
         isOpen={isExportOpen} 
         onClose={() => setIsExportOpen(false)} 
@@ -347,7 +376,8 @@ Best regards,
           ...localData,
           bom: editableBom,
           margin: margin,
-          final_price: calculatedTotal
+          final_price: calculatedTotal,
+          moq: moq // 🌟 把填好的 MOQ 传给装配台！
         }} 
       />
     </>
