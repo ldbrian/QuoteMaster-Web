@@ -389,6 +389,7 @@ export default function Dashboard() {
         </div>
       </main>
 
+      {/* 上传弹窗 */}
       <NewQuoteModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
@@ -396,13 +397,15 @@ export default function Dashboard() {
           setIsModalOpen(false);
           fetchLeads(); 
         }} 
-        // 🌟 CTO 级对接：接住从子组件传出来的演示数据！
+        // 🌟 核心对接点：接住演示卡片传出来的假数据
         onSelectDemo={(demoData) => {
-          setSelectedInquiryId(demoData.id || "demo-quote"); // 给个假 ID 骗过校验，让弹窗打开
-          setDetailData(demoData);                           // 把算好的极品假数据塞进去
+          setIsModalOpen(false);               // 第一步：瞬间关掉上传弹窗
+          setSelectedInquiryId(demoData.id);   // 第二步：激活详情面板的开关
+          setDetailData(demoData);             // 第三步：把完美的假数据喂进去！
         }}
       />
       
+      {/* 报价单详情面板 */}
       <QuoteDetailPanel 
         isOpen={!!selectedInquiryId} 
         onClose={() => {
@@ -411,6 +414,7 @@ export default function Dashboard() {
         }} 
         quoteData={detailData} 
       />
+      
       <button
         onClick={() => {
           alert("💡 欢迎吐槽！\n\n遇到 Bug 了？觉得 AI 算得不准？想加新功能？\n\n请直接联系创始人微信：[ldbrian]\n或发送邮件至：[ldbrian@163.com]\n\n老板，用得不爽直接喷我，您的每一个建议都是我们迭代的动力！");
