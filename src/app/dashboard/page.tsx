@@ -8,7 +8,7 @@ import QuoteDetailPanel from '@/src/components/QuoteDetailPanel';
 import { 
   Search, Bell, Plus, MoreVertical, LogOut,
   LayoutGrid, FileText, Users, MessageSquare, 
-  BarChart2, Settings, Globe, Loader2 ,MessageCircle, Menu, X, Trash2
+  BarChart2, Settings, Globe, Loader2 ,MessageCircle, Menu, X, Trash2 ,Radar, Flame
 } from 'lucide-react'; // 👈 CTO 新增了 Trash2 图标
 
 // 状态标签颜色映射
@@ -257,13 +257,23 @@ export default function Dashboard() {
           </div>
           
           <div onClick={handleComingSoon}>
-            <NavItem icon={<FileText size={20} />} label="核价历史" disabled badge="PRO" />
+            <NavItem icon={<FileText size={20} />} label="核价与打样历史" disabled badge="PRO" />
           </div>
           <div onClick={handleComingSoon}>
-            <NavItem icon={<Users size={20} />} label="客户管理" disabled />
+            <NavItem icon={<BarChart2 size={20} />} label="企业成本看板" disabled />
+          </div>
+
+          {/* 🌟 核心战略前置：第二阶段的核武器曝光 */}
+          <div className="mt-4 mb-1 px-4 text-[10px] font-bold text-blue-500 uppercase tracking-wider flex items-center gap-1">
+            <Flame size={12} className="text-rose-500 animate-pulse" /> 
+            情报大厅 (规划中)
+          </div>
+
+          <div onClick={() => alert("🔥 【全球采买趋势雷达】正在研发中！\n\n未来您可以通过上传真实打样数据，解锁以下特权：\n1. 查看北美/欧洲本周暴增询盘品类\n2. 获取同行该类目的真实成交底价区间\n\n敬请期待我们的“外贸情报大厅”上线！")}>
+            <NavItem icon={<Radar size={20} />} label="全球采买趋势雷达" disabled badge="VIP" />
           </div>
           <div onClick={handleComingSoon}>
-            <NavItem icon={<BarChart2 size={20} />} label="成本分析" disabled />
+            <NavItem icon={<Users size={20} />} label="一键转单/甩单大厅" disabled />
           </div>
         </nav>
 
