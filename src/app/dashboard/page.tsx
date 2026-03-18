@@ -264,8 +264,8 @@ export default function Dashboard() {
           </div>
 
           {/* 🌟 核心战略前置：第二阶段的核武器曝光 */}
-          <div className="mt-4 mb-1 px-4 text-[14px] font-bold text-blue-500 uppercase tracking-wider flex items-center gap-1">
-            <Flame size={20} className="text-rose-500 animate-pulse" /> 
+          <div className="mt-4 mb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <Flame size={12} className="text-rose-500 animate-pulse" /> 
             情报大厅 (规划中)
           </div>
 
