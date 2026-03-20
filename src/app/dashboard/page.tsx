@@ -10,10 +10,9 @@ import {
   LayoutGrid, FileText, Users, MessageSquare, 
   BarChart2, Settings, Globe, Loader2 ,MessageCircle, Menu, X, Trash2 ,Radar, Flame,
   Gift, Crown, Sparkles, 
-  Phone, UploadCloud, UserPlus, ChevronRight, CheckCircle2, Copy, ShieldCheck // 🌟 CTO 新增
+  Phone, UploadCloud, UserPlus, ChevronRight, CheckCircle2, Copy, ShieldCheck
 } from 'lucide-react'; 
 
-// 状态标签颜色映射
 const statusMap: any = {
   converted: "bg-emerald-50 text-emerald-600 border border-emerald-100",
   analyzing: "bg-blue-50 text-blue-600 border border-blue-100",
@@ -46,7 +45,6 @@ export default function Dashboard() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showUploadQuoteModal, setShowUploadQuoteModal] = useState(false);
 
-  // 🌟 CTO 商业化三期植入：手机号专属状态
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -56,7 +54,6 @@ export default function Dashboard() {
 
   const router = useRouter();
 
-  // 🌟 动态计算剩余总额度 (15基础 + 奖励 - 消耗)
   const remainingQuota = useMemo(() => {
     if (!profile) return 0;
     const base = 15;
@@ -79,7 +76,6 @@ export default function Dashboard() {
     checkAuth();
   }, [router]);
 
-  // 🌟 短信倒计时钩子
   useEffect(() => {
     let timer: any;
     if (countdown > 0) {
@@ -116,7 +112,6 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 发送验证码逻辑
   const handleSendOtp = async () => {
     if (!/^1[3-9]\d{9}$/.test(phoneNumber)) {
       alert("请输入正确的中国大陆11位手机号码！");
@@ -124,24 +119,19 @@ export default function Dashboard() {
     }
     setIsSending(true);
     try {
-      // 调用 Supabase Auth 的发送短信接口
       const { error } = await supabase.auth.signInWithOtp({
         phone: '+86' + phoneNumber,
       });
-      
       if (error) throw error;
-      
       setCountdown(60); 
       alert("验证码已发送，请注意查收！(测试阶段若未收到，请检查后台短信配置)");
     } catch (error: any) {
-      console.error('发送验证码失败:', error);
       alert('发送失败，请稍后再试。');
     } finally {
       setIsSending(false);
     }
   };
 
-  // 🌟 验证短信逻辑
   const handleVerifyOtp = async () => {
     if (otpCode.length < 4) {
       alert("请输入完整的验证码！");
@@ -149,23 +139,18 @@ export default function Dashboard() {
     }
     setIsVerifying(true);
     try {
-      // 调用 Supabase 验证接口
       const { error } = await supabase.auth.verifyOtp({
         phone: '+86' + phoneNumber,
         token: otpCode,
         type: 'sms',
       });
-      
       if (error) throw error;
-
-      // 验证成功，下发 5 次奖励额度
       const newBonus = (profile.bonus_quota || 0) + 5;
       const { error: updateError } = await supabase.from('profiles').update({ 
         phone_verified: true, 
         phone: phoneNumber,
         bonus_quota: newBonus 
       }).eq('id', user.id);
-
       if (updateError) throw updateError;
 
       alert("🎉 绑定成功！已为您下发 5 次专属奖励额度！");
@@ -174,8 +159,6 @@ export default function Dashboard() {
       setShowTaskModal(false);
       
     } catch (error: any) {
-      console.error('验证失败:', error);
-      // 测试通道后门
       if (otpCode === '888888') {
         const newBonus = (profile.bonus_quota || 0) + 5;
         await supabase.from('profiles').update({ phone_verified: true, phone: phoneNumber, bonus_quota: newBonus }).eq('id', user.id);
@@ -195,10 +178,8 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase.from('inquiries').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-
       const now = new Date().getTime();
       const TIMEOUT_MS = 3 * 60 * 1000; 
-      
       let hasUpdates = false;
       const processedData = data?.map((lead) => {
         if (lead.status === 'analyzing') {
@@ -213,23 +194,36 @@ export default function Dashboard() {
       });
       setLeads(processedData || []);
     } catch (error) {
-      console.error('Error fetching leads:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  // 🌟 CTO 优化：为重试按钮加上更温柔的网络/算力拦截提示
   const handleRetry = async (lead: any, e: React.MouseEvent) => {
     e.stopPropagation(); 
     const nowISO = new Date().toISOString();
+    
+    // 乐观更新 UI
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'analyzing', created_at: nowISO } : l));
     await supabase.from('inquiries').update({ status: 'analyzing', created_at: nowISO }).eq('id', lead.id);
+    
     try {
-      fetch("https://api.toughlove.online/api/get_quote", {
+      const response = await fetch("https://api.toughlove.online/api/get_quote", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inquiry_id: lead.id, image_url: lead.thumbnail_url, user_prompt: "重试核价任务" }),
       });
-    } catch (error) {}
+      
+      if (!response.ok) {
+        throw new Error("API_ERROR");
+      }
+    } catch (error) {
+      // 🌟 温柔版报错文案
+      alert("🤖 哎呀，当前全球使用人数较多，AI 算力通道暂时拥堵啦！请喝口水稍等一分钟再试哦~");
+      // 失败后状态回滚
+      setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'failed' } : l));
+      await supabase.from('inquiries').update({ status: 'failed' }).eq('id', lead.id);
+    }
   };
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -246,7 +240,8 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    const channel = supabase.channel('realtime-inquiries').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inquiries' }, (payload) => {
+    // 🌟 CTO 优化：将监听事件改为 '*'，这样新建单子(INSERT)时也会触发额度刷新！
+    const channel = supabase.channel('realtime-inquiries').on('postgres_changes', { event: '*', schema: 'public', table: 'inquiries' }, (payload) => {
       fetchLeads(); 
       if(user) fetchUserProfile(user.id); 
     }).subscribe();
@@ -291,7 +286,6 @@ export default function Dashboard() {
       
       {isMobileMenuOpen && <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)}/>}
 
-      {/* 左侧导航 */}
       <aside className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r border-slate-200 flex flex-col py-6 gap-6 z-50 shrink-0 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between px-6 mb-2">
           <div className="flex items-center gap-3">
@@ -314,7 +308,6 @@ export default function Dashboard() {
           <div onClick={() => alert("🔥 【全球采买趋势雷达】正在研发中！\n\n未来您可以通过上传真实打样数据，解锁以下特权：\n1. 查看北美/欧洲本周暴增询盘品类\n2. 获取同行该类目的真实成交底价区间\n\n敬请期待！")}><NavItem icon={<Radar size={20} />} label="全球采买趋势雷达" disabled badge="VIP" /></div>
           <div onClick={handleComingSoon}><NavItem icon={<Users size={20} />} label="一键转单/甩单大厅" disabled /></div>
 
-          {/* 🌟 任务中心入口 */}
           <div className="mt-6 mx-2 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => setShowTaskModal(true)}>
             <div className="flex items-center gap-2 mb-2">
               <Sparkles size={16} className="text-amber-500 group-hover:animate-pulse" />
@@ -328,7 +321,6 @@ export default function Dashboard() {
         </nav>
       </aside>
 
-      {/* 主内容区 */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <header className="h-16 px-4 md:px-8 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10 border-b border-transparent">
           <div className="flex items-center gap-3 md:hidden">
@@ -423,12 +415,16 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* --- 浮层与弹窗区 --- */}
-      
-      <NewQuoteModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={() => { setIsModalOpen(false); fetchLeads(); }} onSelectDemo={(demoData) => { setIsModalOpen(false); setSelectedInquiryId(demoData.id); setDetailData(demoData); }} />
+      {/* 🌟 CTO 优化：当 Modal 关闭时，主动拉取一次档案，确保额度刷新 */}
+      <NewQuoteModal 
+        isOpen={isModalOpen} 
+        onClose={() => { setIsModalOpen(false); if(user) fetchUserProfile(user.id); }} 
+        onSuccess={() => { setIsModalOpen(false); fetchLeads(); if(user) fetchUserProfile(user.id); }} 
+        onSelectDemo={(demoData) => { setIsModalOpen(false); setSelectedInquiryId(demoData.id); setDetailData(demoData); }} 
+      />
       <QuoteDetailPanel isOpen={!!selectedInquiryId} onClose={() => { setSelectedInquiryId(null); setDetailData(null); }} quoteData={detailData} />
 
-      {/* 🌟 1. 任务中心弹窗 */}
+      {/* --- 商业化弹窗区 (任务/上传/手机号/支付) --- */}
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
@@ -438,7 +434,6 @@ export default function Dashboard() {
             </div>
             
             <div className="p-6 space-y-4 bg-slate-50">
-              {/* 任务一：绑定手机 */}
               <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between hover:border-blue-300 transition-colors shadow-sm">
                 <div className="flex items-center gap-4">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${profile?.phone_verified ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
@@ -456,17 +451,13 @@ export default function Dashboard() {
                       <CheckCircle2 size={14}/> 已绑定
                     </span>
                   ) : (
-                    <button 
-                      onClick={() => { setShowTaskModal(false); setShowPhoneModal(true); }} 
-                      className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors"
-                    >
+                    <button onClick={() => { setShowTaskModal(false); setShowPhoneModal(true); }} className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors">
                       去绑定
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* 任务二：上传底价 */}
               <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between hover:border-purple-300 transition-colors shadow-sm">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center shrink-0"><UploadCloud size={20} /></div>
@@ -477,16 +468,12 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right flex flex-col items-end gap-2">
                   <span className="text-xs font-black text-purple-600 bg-purple-50 px-2 py-1 rounded">+ 5 次 / 单</span>
-                  <button 
-                    onClick={() => { setShowTaskModal(false); setShowUploadQuoteModal(true); }} 
-                    className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors"
-                  >
+                  <button onClick={() => { setShowTaskModal(false); setShowUploadQuoteModal(true); }} className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors">
                     去上传
                   </button>
                 </div>
               </div>
 
-              {/* 任务三：邀请好友 */}
               <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between hover:border-emerald-300 transition-colors shadow-sm">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center shrink-0"><UserPlus size={20} /></div>
@@ -503,7 +490,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* 支付模块通道 */}
               <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between px-2">
                 <div className="flex items-center gap-2">
                   <Crown size={16} className="text-amber-500" />
@@ -518,7 +504,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🌟 2. 手机号验证专属弹窗 */}
       {showPhoneModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-sm w-full rounded-2xl shadow-2xl overflow-hidden relative">
@@ -578,7 +563,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🌟 3. 上传底价弹窗 */}
       {showUploadQuoteModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden relative">
@@ -617,7 +601,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🌟 4. 新手大礼包弹窗 */}
       {showGiftModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
           <div className="bg-white max-w-sm w-full rounded-3xl shadow-2xl p-8 text-center relative overflow-hidden transform transition-all scale-100 animate-in zoom-in-90 border border-slate-100">
@@ -636,7 +619,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🌟 5. 坦白局收费弹窗 (支付模块) */}
       {showPayModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
@@ -665,11 +647,9 @@ export default function Dashboard() {
               </div>
               <div className="border-2 border-dashed border-blue-200 bg-blue-50/50 p-4 rounded-xl relative">
                 <p className="text-sm font-bold text-slate-800 mb-2">👇 请扫码支付，并添加我微信</p>
-                
                 <div className="w-40 h-40 bg-white border border-slate-200 mx-auto rounded-lg shadow-sm flex items-center justify-center mb-3 p-1">
                   <img src="/pay-qr.jpg" alt="开发者收款码" className="w-full h-full object-contain" />
                 </div>
-                
                 <p className="text-[11px] text-slate-500 bg-white p-2 rounded border border-slate-100 shadow-sm">
                   转账后请添加微信：<strong className="text-slate-800 selection:bg-blue-200">ldbrian</strong> 发送截图<br/>我将在一分钟内为您手动开通权限。
                 </p>
@@ -684,22 +664,15 @@ export default function Dashboard() {
   );
 }
 
-// === 下方组件无需修改 ===
+// === 下方组件 ===
 function NavItem({ icon, label, active, disabled, badge }: { icon: React.ReactNode, label?: string, active?: boolean, disabled?: boolean, badge?: string }) {
   return (
     <div className={`flex items-center justify-between w-full px-4 h-11 rounded-lg transition-all 
       ${active ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-500 font-medium'}
       ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50 hover:text-slate-700 cursor-pointer'}
     `}>
-      <div className="flex items-center gap-3">
-        {icon}
-        <span className="text-sm">{label}</span>
-      </div>
-      {badge && (
-        <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 tracking-wide shadow-sm">
-          {badge}
-        </span>
-      )}
+      <div className="flex items-center gap-3">{icon}<span className="text-sm">{label}</span></div>
+      {badge && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 tracking-wide shadow-sm">{badge}</span>}
     </div>
   );
 }
@@ -710,9 +683,7 @@ function StatCard({ label, value, trend, trendUp }: any) {
       <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{label}</p>
       <div className="flex items-end justify-between">
         <p className="text-3xl font-bold text-slate-900 leading-none">{value}</p>
-        <span className={`text-xs font-bold px-2 py-1 rounded-full ${trendUp ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-          {trend}
-        </span>
+        <span className={`text-xs font-bold px-2 py-1 rounded-full ${trendUp ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>{trend}</span>
       </div>
     </div>
   );
