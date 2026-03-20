@@ -8,8 +8,9 @@ import QuoteDetailPanel from '@/src/components/QuoteDetailPanel';
 import { 
   Search, Bell, Plus, MoreVertical, LogOut,
   LayoutGrid, FileText, Users, MessageSquare, 
-  BarChart2, Settings, Globe, Loader2 ,MessageCircle, Menu, X, Trash2 ,Radar, Flame
-} from 'lucide-react'; // 👈 CTO 新增了 Trash2 图标
+  BarChart2, Settings, Globe, Loader2 ,MessageCircle, Menu, X, Trash2 ,Radar, Flame,
+  Gift, Crown, Sparkles // 🌟 CTO 商业化植入：新增了这三个图标
+} from 'lucide-react'; 
 
 // 状态标签颜色映射
 const statusMap: any = {
@@ -37,9 +38,15 @@ export default function Dashboard() {
   const [detailData, setDetailData] = useState<any>(null); 
   const [user, setUser] = useState<any>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // 🌟 CTO 商业化植入：新增三个状态变量
+  const [profile, setProfile] = useState<any>(null); // 存数据库里的档案（剩余次数等）
+  const [showGiftModal, setShowGiftModal] = useState(false); // 控制新手大礼包弹窗
+  const [showPayModal, setShowPayModal] = useState(false); // 控制坦白局收款弹窗
+
   const router = useRouter();
 
-  // 身份核验
+  // 身份核验与档案拉取
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -48,10 +55,43 @@ export default function Dashboard() {
       } else {
         setUser(session.user);
         fetchLeads();
+        fetchUserProfile(session.user.id); // 🌟 拉取业务档案
       }
     };
     checkAuth();
   }, [router]);
+
+  // 🌟 CTO 商业化植入：拉取用户档案并判定是否弹大礼包
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (data) {
+        setProfile(data);
+        // 如果是免费用户，且1次都没用过，且本地没记录过“已领奖”，就弹窗！
+        if (data.tier === 'free' && data.usage_count === 0 && !localStorage.getItem('giftClaimed')) {
+          setShowGiftModal(true);
+        }
+      }
+    } catch (err) {
+      console.error("无法获取用户档案", err);
+    }
+  };
+
+  // 🌟 CTO 商业化植入：点击领取奖品逻辑
+  const handleClaimGift = () => {
+    localStorage.setItem('giftClaimed', 'true');
+    setShowGiftModal(false);
+    setIsModalOpen(true); // 领完奖直接弹开上传窗口趁热打铁
+  };
+
+  // 🌟 CTO 商业化植入：拦截新建报价点击（没额度就弹收款码）
+  const handleNewQuoteClick = () => {
+    if (profile && profile.tier === 'free' && profile.usage_count >= 15) {
+      setShowPayModal(true); // 额度用光，弹出坦白局收款码
+    } else {
+      setIsModalOpen(true); // 还有额度或者VIP，正常打开
+    }
+  };
 
   // 拉取真实数据，并处理超时孤儿任务
   const fetchLeads = async () => {
@@ -74,9 +114,8 @@ export default function Dashboard() {
           const leadTime = new Date(lead.created_at).getTime();
           if (now - leadTime > TIMEOUT_MS) {
             hasUpdates = true;
-            // 顺手在数据库里把它改成 failed
             supabase.from('inquiries').update({ status: 'failed' }).eq('id', lead.id).then();
-            return { ...lead, status: 'failed' }; // 本地直接变状态
+            return { ...lead, status: 'failed' }; 
           }
         }
         return lead;
@@ -92,65 +131,40 @@ export default function Dashboard() {
 
   // 重试失败的任务
   const handleRetry = async (lead: any, e: React.MouseEvent) => {
-    e.stopPropagation(); // 阻止点击整行打开详情页
-    
-    // 获取当前最新时间，用来重置秒表
+    e.stopPropagation(); 
     const nowISO = new Date().toISOString();
-
-    // 1. 乐观更新 UI，变回分析中，并且重置本地倒计时！
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'analyzing', created_at: nowISO } : l));
-    
-    // 2. 更新数据库：改状态，并且重置数据库的创建时间！
-    await supabase.from('inquiries').update({ 
-      status: 'analyzing',
-      created_at: nowISO  
-    }).eq('id', lead.id);
+    await supabase.from('inquiries').update({ status: 'analyzing', created_at: nowISO }).eq('id', lead.id);
 
-    // 3. 重新给 Python 后端发任务
     try {
       fetch("https://api.toughlove.online/api/get_quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inquiry_id: lead.id,
-          image_url: lead.thumbnail_url,
-          user_prompt: "重试核价任务" 
-        }),
+        body: JSON.stringify({ inquiry_id: lead.id, image_url: lead.thumbnail_url, user_prompt: "重试核价任务" }),
       });
     } catch (error) {
       console.log("重试任务已发送");
     }
   };
 
-  // 🌟 CTO 新增：删除核价记录的终极函数
+  // 删除核价记录
   const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // 防止点击删除时触发整行的跳转/点击事件
-    
-    // 1. 防呆确认
+    e.stopPropagation(); 
     const isConfirmed = window.confirm('确定要删除这条核价记录吗？删除后无法恢复。');
     if (!isConfirmed) return;
 
     try {
-      // 2. 乐观更新：让数据在前端瞬间消失，体验极度丝滑
       setLeads((prev) => prev.filter((item) => item.id !== id));
-
-      // 3. 真实数据库删除操作
-      const { error } = await supabase
-        .from('inquiries')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('inquiries').delete().eq('id', id);
       if (error) throw error;
-      
     } catch (error: any) {
       console.error('删除失败:', error);
       alert('删除失败: ' + error.message);
-      // 如果报错了，为了安全起见，重新拉取一次真实的数据库列表兜底
       fetchLeads(); 
     }
   };
 
-  // Supabase 实时监听，后端算完自动推送刷新
+  // Supabase 实时监听
   useEffect(() => {
     const channel = supabase
       .channel('realtime-inquiries')
@@ -158,29 +172,26 @@ export default function Dashboard() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'inquiries' },
         (payload) => {
-          console.log('🎉 收到后端处理完成推送！', payload);
-          fetchLeads(); // 静默刷新列表
+          fetchLeads(); 
+          // 🌟 每次成功算完一单，静默刷新一下用户档案，更新他消耗的次数
+          if(user) fetchUserProfile(user.id); 
         }
       )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [user]);
 
-  // 动态计算真实的 KPI 数据
+  // 动态计算 KPIs
   const kpiData = useMemo(() => {
     const totalValue = leads.reduce((sum, lead) => sum + (Number(lead.estimated_value) || 0), 0);
     const formattedTotal = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalValue);
     const pendingCount = leads.filter(lead => lead.status === 'analyzing' || lead.status === 'pending').length;
-
     return { formattedTotal, pendingCount };
   }, [leads]);
 
-  // 点击行的处理函数
   const handleOpenDetail = async (lead: any) => {
-    // 如果正在分析中，不可点击打开
     if (lead.status === 'analyzing') return;
-    
     setSelectedInquiryId(lead.id);
     setDetailData(lead); 
 
@@ -194,12 +205,8 @@ export default function Dashboard() {
         .limit(1);
 
       if (error) throw error;
-
       if (data && data.length > 0 && data[0].quote_data) {
-        setDetailData({
-          ...lead,               
-          ...data[0].quote_data  
-        });
+        setDetailData({ ...lead, ...data[0].quote_data });
       }
     } catch (err) {
       console.error('Failed to fetch quote details:', err);
@@ -227,18 +234,13 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-[#F8FAFC] font-sans text-slate-900 selection:bg-blue-100 relative overflow-hidden">
       
-      {/* 手机端半透明遮罩层 */}
       {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)}/>
       )}
 
-      {/* 左侧导航 - 响应式改造：手机端变为滑动抽屉，PC端固定 */}
+      {/* 左侧导航 */}
       <aside className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r border-slate-200 flex flex-col py-6 gap-6 z-50 shrink-0 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
-        {/* Logo 和 产品名 */}
         <div className="flex items-center justify-between px-6 mb-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-200">Q</div>
@@ -255,25 +257,29 @@ export default function Dashboard() {
           <div className="mt-4 mb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             工作空间 (即将上线)
           </div>
-          
-          <div onClick={handleComingSoon}>
-            <NavItem icon={<FileText size={20} />} label="核价与打样历史" disabled badge="PRO" />
-          </div>
-          <div onClick={handleComingSoon}>
-            <NavItem icon={<BarChart2 size={20} />} label="企业成本看板" disabled />
-          </div>
+          <div onClick={handleComingSoon}><NavItem icon={<FileText size={20} />} label="核价与打样历史" disabled badge="PRO" /></div>
+          <div onClick={handleComingSoon}><NavItem icon={<BarChart2 size={20} />} label="企业成本看板" disabled /></div>
 
-          {/* 🌟 核心战略前置：第二阶段的核武器曝光 */}
+          {/* 情报大厅 */}
           <div className="mt-4 mb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
             <Flame size={12} className="text-rose-500 animate-pulse" /> 
             情报大厅 (规划中)
           </div>
-
           <div onClick={() => alert("🔥 【全球采买趋势雷达】正在研发中！\n\n未来您可以通过上传真实打样数据，解锁以下特权：\n1. 查看北美/欧洲本周暴增询盘品类\n2. 获取同行该类目的真实成交底价区间\n\n敬请期待我们的“外贸情报大厅”上线！")}>
             <NavItem icon={<Radar size={20} />} label="全球采买趋势雷达" disabled badge="VIP" />
           </div>
-          <div onClick={handleComingSoon}>
-            <NavItem icon={<Users size={20} />} label="一键转单/甩单大厅" disabled />
+          <div onClick={handleComingSoon}><NavItem icon={<Users size={20} />} label="一键转单/甩单大厅" disabled /></div>
+
+          {/* 🌟 CTO 商业化植入：赚取额度任务中心入口 */}
+          <div className="mt-6 mx-2 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles size={16} className="text-amber-500" />
+              <span className="text-xs font-bold text-slate-800">赚取免费额度</span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-tight mb-3">上传老订单底价 或 邀请同行，即可解锁算力盲盒。</p>
+            <button onClick={() => alert("🏆 任务中心火热搭建中！\n\n下周上线后：\n1. 上传真实底价送 5 次\n2. 邀请好友注册送 10 次\n\n敬请期待！")} className="w-full py-1.5 bg-white border border-blue-200 text-blue-600 rounded text-xs font-bold hover:bg-blue-600 hover:text-white transition-colors">
+              前往任务中心
+            </button>
           </div>
         </nav>
 
@@ -283,11 +289,8 @@ export default function Dashboard() {
       </aside>
 
       {/* 主内容区 */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <header className="h-16 px-4 md:px-8 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10 border-b border-transparent">
-          
-          {/* 手机端：汉堡菜单按钮 + 极简 Logo */}
           <div className="flex items-center gap-3 md:hidden">
             <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg">
               <Menu size={24} />
@@ -295,7 +298,6 @@ export default function Dashboard() {
             <span className="font-bold text-lg text-slate-800 tracking-tight">QM</span>
           </div>
 
-          {/* PC端：搜索框 (手机端隐藏) */}
           <div className="relative w-96 group hidden md:block" onClick={handleComingSoon}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 opacity-50" size={16} />
             <input readOnly type="text" placeholder="搜索线索 (即将上线)..." className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm cursor-not-allowed opacity-60 focus:outline-none" />
@@ -310,13 +312,22 @@ export default function Dashboard() {
                 <p className="text-sm font-bold text-slate-700 leading-none">
                   {user.email?.split('@')[0] || 'Admin'}
                 </p>
-                <p className="text-xs text-slate-400 mt-1">当前用户</p>
+                {/* 🌟 CTO 商业化植入：实时显示剩余额度 */}
+                {profile ? (
+                  profile.tier === 'free' ? (
+                    <div className="text-[11px] text-blue-600 font-bold mt-1.5 flex items-center justify-end gap-1 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 shadow-sm cursor-help" title="用完可做任务或升级获取">
+                      <Gift size={10} /> 剩余 {Math.max(0, 15 - (profile.usage_count || 0))} 次免费
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-amber-600 font-bold mt-1.5 flex items-center justify-end gap-1 bg-gradient-to-r from-amber-50 to-yellow-100 px-2 py-0.5 rounded-full border border-amber-200 shadow-sm">
+                      <Crown size={10} /> Pro 无限火力
+                    </div>
+                  )
+                ) : (
+                  <div className="text-[11px] text-slate-400 mt-1">加载中...</div>
+                )}
               </div>
-              <button 
-                onClick={handleLogout} 
-                className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-full transition-colors bg-slate-50 md:bg-transparent" 
-                title="退出登录"
-              >
+              <button onClick={handleLogout} className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-full transition-colors bg-slate-50 md:bg-transparent" title="退出登录">
                 <LogOut size={18} />
               </button>
             </div>
@@ -331,30 +342,25 @@ export default function Dashboard() {
             </div>
             
             <button 
-              onClick={() => setIsModalOpen(true)}
+              onClick={handleNewQuoteClick} // 🌟 CTO 商业化植入：拦截器上线
               className="w-full sm:w-auto bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium text-sm shadow-lg shadow-blue-200 flex justify-center items-center gap-2 hover:bg-blue-700 cursor-pointer active:scale-95 transition-all"
             >
               <Plus size={18} /> 新建 AI 核价
             </button>
           </div>
 
-          {/* 动态指标卡片 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <StatCard label="总询盘数" value={leads.length} trend="实时" trendUp={true} />
             <StatCard label="预估 FOB 总值" value={kpiData.formattedTotal} trend="已计算" trendUp={true} />
             <StatCard label="等待/分析中" value={kpiData.pendingCount} trend={kpiData.pendingCount > 0 ? "处理中" : "已全部完成"} trendUp={kpiData.pendingCount === 0} />
           </div>
 
-          {/* 表格区域 */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-h-[300px]">
             <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center">
               <h2 className="font-bold text-slate-800">最近询盘</h2>
             </div>
-            
             {loading ? (
-              <div className="flex justify-center items-center h-40 text-slate-400 gap-2">
-                <Loader2 className="animate-spin" /> 数据加载中...
-              </div>
+              <div className="flex justify-center items-center h-40 text-slate-400 gap-2"><Loader2 className="animate-spin" /> 数据加载中...</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -370,24 +376,16 @@ export default function Dashboard() {
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {leads.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">
-                          暂无核价记录。点击“新建 AI 核价”开始！
-                        </td>
-                      </tr>
+                      <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">暂无核价记录。点击“新建 AI 核价”开始！</td></tr>
                     ) : (
                       leads.map((lead) => (
                         <TableRow 
                           key={lead.id}
                           img={lead.thumbnail_url ? <img src={lead.thumbnail_url} className="w-10 h-10 object-cover rounded-lg" alt="" /> : "📦"} 
-                          name={lead.product_name || '未知产品'} 
-                          source={lead.source} 
-                          region={lead.region || 'Global'} 
-                          status={lead.status} 
-                          price={lead.estimated_value ? `$${lead.estimated_value}` : '--'} 
+                          name={lead.product_name || '未知产品'} source={lead.source} region={lead.region || 'Global'} status={lead.status} price={lead.estimated_value ? `$${lead.estimated_value}` : '--'} 
                           onClick={() => handleOpenDetail(lead)}
                           onRetry={(e: React.MouseEvent) => handleRetry(lead, e)} 
-                          onDelete={(e: React.MouseEvent) => handleDelete(lead.id, e)} // 👈 传递给子组件的删除函数
+                          onDelete={(e: React.MouseEvent) => handleDelete(lead.id, e)}
                         />
                       ))
                     )}
@@ -403,27 +401,15 @@ export default function Dashboard() {
       <NewQuoteModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        onSuccess={() => {
-          setIsModalOpen(false);
-          fetchLeads(); 
-        }} 
-        // 🌟 核心对接点：接住演示卡片传出来的假数据
+        onSuccess={() => { setIsModalOpen(false); fetchLeads(); }} 
         onSelectDemo={(demoData) => {
-          setIsModalOpen(false);               // 第一步：瞬间关掉上传弹窗
-          setSelectedInquiryId(demoData.id);   // 第二步：激活详情面板的开关
-          setDetailData(demoData);             // 第三步：把完美的假数据喂进去！
+          setIsModalOpen(false);               
+          setSelectedInquiryId(demoData.id);   
+          setDetailData(demoData);             
         }}
       />
       
-      {/* 报价单详情面板 */}
-      <QuoteDetailPanel 
-        isOpen={!!selectedInquiryId} 
-        onClose={() => {
-          setSelectedInquiryId(null);
-          setDetailData(null); 
-        }} 
-        quoteData={detailData} 
-      />
+      <QuoteDetailPanel isOpen={!!selectedInquiryId} onClose={() => { setSelectedInquiryId(null); setDetailData(null); }} quoteData={detailData} />
       
       <button
         onClick={() => {
@@ -436,11 +422,100 @@ export default function Dashboard() {
           提个建议 / Bug
         </span>
       </button>
+
+      {/* 🌟 CTO 商业化植入 1：新手大礼包弹窗 */}
+      {showGiftModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white max-w-sm w-full rounded-3xl shadow-2xl p-8 text-center relative overflow-hidden transform transition-all scale-100 animate-in zoom-in-90 border border-slate-100">
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-amber-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+            
+            <div className="relative z-10">
+              <div className="w-20 h-20 bg-gradient-to-tr from-blue-600 to-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-200 transform -rotate-6">
+                <Gift className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-800 mb-2">恭喜入驻 QuoteMaster!</h2>
+              <p className="text-slate-500 text-sm leading-relaxed mb-8">
+                已为您充值 <strong className="text-blue-600 text-lg">15 次</strong> 旗舰版 AI 极速核价特权。<br/>无需绑定信用卡，立刻感受 30 秒出单的震撼。
+              </p>
+              
+              <button 
+                onClick={handleClaimGift}
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Sparkles size={18} /> 立即开启我的首单测算
+              </button>
+              
+              <button 
+                onClick={() => { localStorage.setItem('giftClaimed', 'true'); setShowGiftModal(false); }}
+                className="mt-4 text-xs text-slate-400 hover:text-slate-600 font-medium"
+              >
+                稍后使用
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 CTO 商业化植入 2：坦白局收费弹窗 */}
+      {showPayModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
+            <button onClick={() => setShowPayModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 z-10"><X size={20} /></button>
+            
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Flame size={28} />
+              </div>
+              <h2 className="text-xl font-bold text-slate-800 mb-2">🚀 免费算力已耗尽，但这只是开始...</h2>
+              <div className="text-sm text-slate-600 text-left space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6">
+                <p>嗨，朋友，我是 QuoteMaster 的独立开发者兼打杂小哥。</p>
+                <p>感谢你用光了 15 次额度！这说明我熬夜敲出来的 AI 引擎真的帮到了你。说句掏心窝子的话，背后的底层大模型调用费确实有点贵，我的服务器已经快冒烟了 😅。</p>
+                <p>如果这个工具帮你省下了时间，甚至帮你留住了客户，<strong className="text-slate-800">恳请你请我喝杯咖啡 (¥199 / 月)</strong>，解锁【Pro 无限火力版】。</p>
+              </div>
+
+              <div className="bg-slate-900 p-4 rounded-xl flex items-center justify-between text-left mb-6">
+                <div>
+                  <p className="text-white font-bold flex items-center gap-1.5"><Crown size={16} className="text-amber-400"/> Pro 无限火力特权</p>
+                  <ul className="text-slate-400 text-xs mt-1 space-y-0.5">
+                    <li>• 无限制 AI 看图核价</li>
+                    <li>• 解锁隐藏的深度 BOM 明细</li>
+                    <li>• 开发者 1对1 优先支持</li>
+                  </ul>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-black text-white">¥199</p>
+                  <p className="text-[10px] text-slate-400">/ 每月</p>
+                </div>
+              </div>
+
+              <div className="border-2 border-dashed border-blue-200 bg-blue-50/50 p-4 rounded-xl relative">
+                <p className="text-sm font-bold text-slate-800 mb-2">👇 请扫码支付，并添加我微信</p>
+                
+                {/* ⚠️ 替换这里为你真实的收款码链接！！！ */}
+                <div className="w-40 h-40 bg-white border border-slate-200 mx-auto rounded-lg shadow-sm flex items-center justify-center mb-3 p-1">
+                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=WECHAT_PAY_CODE_HERE" alt="收款码" className="w-full h-full object-contain opacity-50" />
+                  {/* 注：请把上面的 src 换成你真实的微信收款码图片链接，或者上传到 public 目录用 /pay-qr.jpg */}
+                </div>
+                
+                <p className="text-[11px] text-slate-500 bg-white p-2 rounded border border-slate-100 shadow-sm">
+                  转账后请添加微信：<strong className="text-slate-800 selection:bg-blue-200">ldbrian</strong> 发送截图<br/>我将在一分钟内为您手动开通权限。
+                </p>
+              </div>
+
+              <button onClick={() => setShowPayModal(false)} className="mt-4 text-xs font-medium text-slate-400 hover:text-slate-600">
+                暂不升级，我去看看别的
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
 
-// === 修改：Navitem 支持 disabled 变灰样式 ===
+// === 下方组件无需修改 ===
 function NavItem({ icon, label, active, disabled, badge }: { icon: React.ReactNode, label?: string, active?: boolean, disabled?: boolean, badge?: string }) {
   return (
     <div className={`flex items-center justify-between w-full px-4 h-11 rounded-lg transition-all 
@@ -451,7 +526,6 @@ function NavItem({ icon, label, active, disabled, badge }: { icon: React.ReactNo
         {icon}
         <span className="text-sm">{label}</span>
       </div>
-      {/* 诱人的小角标 */}
       {badge && (
         <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 tracking-wide shadow-sm">
           {badge}
@@ -501,14 +575,9 @@ function TableRow({ img, name, source, region, status, price, onClick, onRetry, 
       </td>
       <td className="px-6 py-4 text-sm font-bold text-slate-900">{price}</td>
       <td className="px-6 py-4 text-right">
-        
-        {/* 🌟 CTO 级改造：动作区重构，把删除按钮优雅地加进去 */}
         <div className="flex items-center justify-end gap-3">
           {isFailed ? (
-             <button 
-               onClick={onRetry} 
-               className="text-xs px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 rounded-md font-medium transition-colors"
-             >
+             <button onClick={onRetry} className="text-xs px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 rounded-md font-medium transition-colors">
                重新测算
              </button>
           ) : (
@@ -516,17 +585,10 @@ function TableRow({ img, name, source, region, status, price, onClick, onRetry, 
               <MoreVertical size={16} />
             </button>
           )}
-
-          {/* 垃圾桶按钮，所有状态均可删除 */}
-          <button 
-            onClick={onDelete} 
-            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-            title="删除记录"
-          >
+          <button onClick={onDelete} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors" title="删除记录">
             <Trash2 size={16} />
           </button>
         </div>
-
       </td>
     </tr>
   );
