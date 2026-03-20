@@ -470,7 +470,8 @@ export default function Dashboard() {
       {/* 🌟 4. 坦白局收费弹窗 (支付模块) */}
       {showPayModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
+          {/* 👇 CTO修改：max-w-md 改成了 max-w-lg，和任务弹窗一样宽 */}
+          <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
             <button onClick={() => setShowPayModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 z-10"><X size={20} /></button>
             <div className="p-8 text-center">
               <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4"><Flame size={28} /></div>
@@ -496,9 +497,12 @@ export default function Dashboard() {
               </div>
               <div className="border-2 border-dashed border-blue-200 bg-blue-50/50 p-4 rounded-xl relative">
                 <p className="text-sm font-bold text-slate-800 mb-2">👇 请扫码支付，并添加我微信</p>
+                
                 <div className="w-40 h-40 bg-white border border-slate-200 mx-auto rounded-lg shadow-sm flex items-center justify-center mb-3 p-1">
-                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=WECHAT_PAY_CODE_HERE" alt="收款码" className="w-full h-full object-contain opacity-50" />
+                  {/* 👇 CTO修改：去掉了半透明，路径直接指向 public 目录下的 pay-qr.jpg */}
+                  <img src="/pay-qr.png" alt="开发者收款码" className="w-full h-full object-contain" />
                 </div>
+                
                 <p className="text-[11px] text-slate-500 bg-white p-2 rounded border border-slate-100 shadow-sm">
                   转账后请添加微信：<strong className="text-slate-800 selection:bg-blue-200">ldbrian</strong> 发送截图<br/>我将在一分钟内为您手动开通权限。
                 </p>
