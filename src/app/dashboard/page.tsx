@@ -501,7 +501,30 @@ export default function Dashboard() {
                   <button onClick={() => { setShowTaskModal(false); setShowUploadQuoteModal(true); }} className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors">去上传</button>
                 </div>
               </div>
-
+                  {/* 🌟 补回：邀请同行任务 */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between hover:border-orange-300 transition-colors shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center shrink-0">
+                    <UserPlus size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">邀请同行注册</h4>
+                    <p className="text-xs text-slate-500 mt-0.5">每成功邀请 1 人，双方各得 5 次</p>
+                  </div>
+                </div>
+                <div className="text-right flex flex-col items-end gap-2">
+                  <span className="text-xs font-black text-orange-600 bg-orange-50 px-2 py-1 rounded">+ 5 次 / 人</span>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText("我发现了一个超好用的AI外贸看图报价神器，注册直接送15次极速核价额度！快来试试：https://quotemaster.ai");
+                      alert("✅ 专属邀请链接已复制到剪贴板！去发给同行好友吧！");
+                    }} 
+                    className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1"
+                  >
+                    <Copy size={14} /> 复制链接
+                  </button>
+                </div>
+              </div>
               <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between px-2">
                 <div className="flex items-center gap-2">
                   <Crown size={16} className="text-amber-500" />
