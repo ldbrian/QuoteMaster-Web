@@ -10,7 +10,7 @@ import {
   LayoutGrid, FileText, Users, MessageSquare, 
   BarChart2, Settings, Globe, Loader2 ,MessageCircle, Menu, X, Trash2 ,Radar, Flame,
   Gift, Crown, Sparkles, 
-  Phone, UploadCloud, UserPlus, ChevronRight, CheckCircle2, Copy, ShieldCheck
+  Phone, UploadCloud, UserPlus, ChevronRight, CheckCircle2, Copy, ShieldCheck 
 } from 'lucide-react'; 
 
 const statusMap: any = {
@@ -45,6 +45,9 @@ export default function Dashboard() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showUploadQuoteModal, setShowUploadQuoteModal] = useState(false);
 
+  // 🌟 新增：上传底价表单的状态
+  const [uploadQuoteDate, setUploadQuoteDate] = useState('1month');
+
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -75,6 +78,19 @@ export default function Dashboard() {
     };
     checkAuth();
   }, [router]);
+
+  // 🌟 CTO 核心修复：防休眠断线重连机制
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        // 用户切回网页时，强制刷新一次数据，防止假死报错
+        fetchLeads();
+        fetchUserProfile(user.id);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user]);
 
   useEffect(() => {
     let timer: any;
@@ -112,6 +128,7 @@ export default function Dashboard() {
     }
   };
 
+  // 🌟 已经换成调用我们自己的 API 路由 (阿里云)
   const handleSendOtp = async () => {
     if (!/^1[3-9]\d{9}$/.test(phoneNumber)) {
       alert("请输入正确的中国大陆11位手机号码！");
@@ -125,17 +142,15 @@ export default function Dashboard() {
         body: JSON.stringify({ phone: phoneNumber })
       });
       
-      // 🌟 CTO 防弹补丁：先检查后端是不是按套路出牌给了 JSON
       const contentType = res.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const textError = await res.text();
         console.error("【后端崩溃原话】:", textError);
-        throw new Error("后端服务器罢工了，请切回 VS Code 看终端里的红字报错！");
+        throw new Error("服务器拥堵或密钥未配置，请稍后再试！");
       }
 
       const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error || "发送失败，请检查阿里云配置");
+      if (!res.ok) throw new Error(data.error || "发送失败，请检查手机号或配置");
       
       setCountdown(60); 
       alert("验证码已火速发出，请查看手机！");
@@ -146,6 +161,7 @@ export default function Dashboard() {
     }
   };
 
+  // 🌟 验证阿里云短信
   const handleVerifyOtp = async () => {
     if (otpCode.length < 4) {
       alert("请输入完整的验证码！");
@@ -153,8 +169,7 @@ export default function Dashboard() {
     }
     setIsVerifying(true);
     try {
-      // 💡 测试后门依旧保留，方便你没话费的时候测逻辑
-      if (otpCode === '888888') {
+      if (otpCode === '888888') { // 测试后门
         const newBonus = (profile.bonus_quota || 0) + 5;
         await supabase.from('profiles').update({ phone_verified: true, phone: phoneNumber, bonus_quota: newBonus }).eq('id', user.id);
         alert("🎉 [测试通道] 绑定成功！已为您下发 5 次专属奖励额度！");
@@ -163,17 +178,15 @@ export default function Dashboard() {
         return;
       }
 
-      // 🌟 CTO 换炮：调用阿里云验证 API
       const res = await fetch('/api/verify-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phoneNumber, code: otpCode })
       });
-      const data = await res.json();
       
+      const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || "验证码错误或已过期");
 
-      // 验证成功！写入数据库发奖励！
       const newBonus = (profile.bonus_quota || 0) + 5;
       await supabase.from('profiles').update({ 
         phone_verified: true, 
@@ -219,12 +232,13 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 CTO 优化：为重试按钮加上更温柔的网络/算力拦截提示
   const handleRetry = async (lead: any, e: React.MouseEvent) => {
     e.stopPropagation(); 
+    if (profile && profile.tier === 'free' && remainingQuota <= 0) {
+      setShowPayModal(true);
+      return; 
+    }
     const nowISO = new Date().toISOString();
-    
-    // 乐观更新 UI
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'analyzing', created_at: nowISO } : l));
     await supabase.from('inquiries').update({ status: 'analyzing', created_at: nowISO }).eq('id', lead.id);
     
@@ -233,14 +247,14 @@ export default function Dashboard() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inquiry_id: lead.id, image_url: lead.thumbnail_url, user_prompt: "重试核价任务" }),
       });
-      
-      if (!response.ok) {
-        throw new Error("API_ERROR");
-      }
+      if (!response.ok) throw new Error("API_ERROR");
+
+      const newUsage = (profile?.usage_count || 0) + 1;
+      await supabase.from('profiles').update({ usage_count: newUsage }).eq('id', user.id);
+      if(user) fetchUserProfile(user.id);
+
     } catch (error) {
-      // 🌟 温柔版报错文案
       alert("🤖 哎呀，当前全球使用人数较多，AI 算力通道暂时拥堵啦！请喝口水稍等一分钟再试哦~");
-      // 失败后状态回滚
       setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'failed' } : l));
       await supabase.from('inquiries').update({ status: 'failed' }).eq('id', lead.id);
     }
@@ -260,7 +274,6 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    // 🌟 CTO 优化：将监听事件改为 '*'，这样新建单子(INSERT)时也会触发额度刷新！
     const channel = supabase.channel('realtime-inquiries').on('postgres_changes', { event: '*', schema: 'public', table: 'inquiries' }, (payload) => {
       fetchLeads(); 
       if(user) fetchUserProfile(user.id); 
@@ -435,7 +448,6 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* 🌟 CTO 优化：当 Modal 关闭时，主动拉取一次档案，确保额度刷新 */}
       <NewQuoteModal 
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); if(user) fetchUserProfile(user.id); }} 
@@ -444,7 +456,7 @@ export default function Dashboard() {
       />
       <QuoteDetailPanel isOpen={!!selectedInquiryId} onClose={() => { setSelectedInquiryId(null); setDetailData(null); }} quoteData={detailData} />
 
-      {/* --- 商业化弹窗区 (任务/上传/手机号/支付) --- */}
+      {/* --- 商业化弹窗区 --- */}
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
@@ -471,9 +483,7 @@ export default function Dashboard() {
                       <CheckCircle2 size={14}/> 已绑定
                     </span>
                   ) : (
-                    <button onClick={() => { setShowTaskModal(false); setShowPhoneModal(true); }} className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors">
-                      去绑定
-                    </button>
+                    <button onClick={() => { setShowTaskModal(false); setShowPhoneModal(true); }} className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors">去绑定</button>
                   )}
                 </div>
               </div>
@@ -488,25 +498,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right flex flex-col items-end gap-2">
                   <span className="text-xs font-black text-purple-600 bg-purple-50 px-2 py-1 rounded">+ 5 次 / 单</span>
-                  <button onClick={() => { setShowTaskModal(false); setShowUploadQuoteModal(true); }} className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors">
-                    去上传
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between hover:border-emerald-300 transition-colors shadow-sm">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center shrink-0"><UserPlus size={20} /></div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800">邀请外贸同行</h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5 leading-tight">每邀请1人注册<strong className="text-rose-500 font-bold">并完成手机验证</strong>，<br/>即可获得巨额奖励</p>
-                  </div>
-                </div>
-                <div className="text-right flex flex-col items-end gap-2">
-                  <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded">+ 10 次 / 人</span>
-                  <button onClick={() => alert("🔗 您的专属邀请链接：\nhttps://quotemaster.ai/invite?code=8888\n\n（已复制到剪贴板，快去发给同行吧！）")} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1">
-                    <Copy size={12}/> 专属链接
-                  </button>
+                  <button onClick={() => { setShowTaskModal(false); setShowUploadQuoteModal(true); }} className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors">去上传</button>
                 </div>
               </div>
 
@@ -540,42 +532,20 @@ export default function Dashboard() {
 
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1.5 block">手机号码 (+86)</label>
-                <input 
-                  type="tel" 
-                  maxLength={11}
-                  placeholder="请输入 11 位手机号码" 
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" 
-                />
+                <input type="tel" maxLength={11} placeholder="请输入 11 位手机号码" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
               </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1.5 block">短信验证码</label>
                 <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    maxLength={6}
-                    placeholder="6 位验证码" 
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                    className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" 
-                  />
-                  <button 
-                    onClick={handleSendOtp}
-                    disabled={isSending || countdown > 0 || phoneNumber.length !== 11}
-                    className="w-28 shrink-0 bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold rounded-xl transition-colors"
-                  >
+                  <input type="text" maxLength={6} placeholder="6 位验证码" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <button onClick={handleSendOtp} disabled={isSending || countdown > 0 || phoneNumber.length !== 11} className="w-28 shrink-0 bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold rounded-xl transition-colors">
                     {isSending ? <Loader2 size={16} className="animate-spin mx-auto" /> : (countdown > 0 ? `${countdown}s 后重发` : '获取验证码')}
                   </button>
                 </div>
               </div>
 
-              <button 
-                onClick={handleVerifyOtp}
-                disabled={isVerifying || otpCode.length < 4}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2"
-              >
+              <button onClick={handleVerifyOtp} disabled={isVerifying || otpCode.length < 4} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2">
                 {isVerifying ? <Loader2 size={18} className="animate-spin" /> : '验证并领取 5 次额度'}
               </button>
             </div>
@@ -583,6 +553,7 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* 🌟 核心升级：贡献底价弹窗（增加时效拦截） */}
       {showUploadQuoteModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden relative">
@@ -593,7 +564,7 @@ export default function Dashboard() {
             <div className="p-6 space-y-4">
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex gap-3 text-amber-800 text-xs leading-relaxed">
                 <CheckCircle2 size={16} className="shrink-0 mt-0.5 text-amber-600" />
-                <p><strong>隐私承诺：</strong>您上传的单据将经过脱敏处理，仅用于训练大模型算法，绝对不会向任何第三方展示您的客户或公司信息。审核通过后，<strong>次日将为您发放 5 次 AI 核价额度！</strong></p>
+                <p><strong>隐私承诺：</strong>您上传的单据将经过脱敏处理，仅用于训练大模型算法，绝对不会向任何第三方展示。审核通过后，<strong>次日将为您发放 5 次额度！</strong></p>
               </div>
 
               <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center bg-slate-50 hover:bg-blue-50 hover:border-blue-400 transition-colors cursor-pointer group">
@@ -603,6 +574,19 @@ export default function Dashboard() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">该订单成交/打样日期 <span className="text-rose-500">*</span></label>
+                  <select 
+                    value={uploadQuoteDate} 
+                    onChange={(e) => setUploadQuoteDate(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  >
+                    <option value="1month">最近 1 个月内 (优质数据)</option>
+                    <option value="3months">最近 3 个月内</option>
+                    <option value="6months">最近半年内</option>
+                    <option value="older">半年前</option>
+                  </select>
+                </div>
                 <div>
                   <label className="text-xs font-bold text-slate-500 mb-1 block">真实出厂价 (选填)</label>
                   <input type="text" placeholder="例如: $1.25" className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
@@ -613,7 +597,18 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <button onClick={() => { alert("✅ 提交成功！\n\n系统已收到您的真实单据，我们将在 24 小时内完成人工审核并为您发放 5 次免费额度，感谢您为外贸生态做出的贡献！"); setShowUploadQuoteModal(false); }} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-colors mt-2">
+              {/* 拦截警告 UI */}
+              {uploadQuoteDate === 'older' && (
+                <div className="text-xs text-rose-600 bg-rose-50 p-2 rounded border border-rose-100 font-medium text-center animate-in slide-in-from-top-2">
+                  🚫 抱歉，为保证数据精准度，系统仅接收 6 个月内的近期报价单。
+                </div>
+              )}
+
+              <button 
+                disabled={uploadQuoteDate === 'older'}
+                onClick={() => { alert("✅ 提交成功！\\n系统已收到您的真实单据，我们将在 24 小时内完成人工审核并为您发放 5 次免费额度，感谢您为外贸生态做出的贡献！"); setShowUploadQuoteModal(false); }} 
+                className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 提交审核
               </button>
             </div>
@@ -624,17 +619,13 @@ export default function Dashboard() {
       {showGiftModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
           <div className="bg-white max-w-sm w-full rounded-3xl shadow-2xl p-8 text-center relative overflow-hidden transform transition-all scale-100 animate-in zoom-in-90 border border-slate-100">
-            <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-            <div className="absolute -top-24 -right-24 w-48 h-48 bg-amber-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-            <div className="relative z-10">
-              <div className="w-20 h-20 bg-gradient-to-tr from-blue-600 to-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-200 transform -rotate-6"><Gift className="w-10 h-10 text-white" /></div>
-              <h2 className="text-2xl font-black text-slate-800 mb-2">恭喜入驻 QuoteMaster!</h2>
-              <p className="text-slate-500 text-sm leading-relaxed mb-8">已为您充值 <strong className="text-blue-600 text-lg">15 次</strong> 旗舰版 AI 极速核价特权。<br/>无需绑定信用卡，立刻感受 30 秒出单的震撼。</p>
-              <button onClick={handleClaimGift} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
-                <Sparkles size={18} /> 立即开启我的首单测算
-              </button>
-              <button onClick={() => { localStorage.setItem('giftClaimed', 'true'); setShowGiftModal(false); }} className="mt-4 text-xs text-slate-400 hover:text-slate-600 font-medium">稍后使用</button>
-            </div>
+            <div className="w-20 h-20 bg-gradient-to-tr from-blue-600 to-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-200 transform -rotate-6"><Gift className="w-10 h-10 text-white" /></div>
+            <h2 className="text-2xl font-black text-slate-800 mb-2">恭喜入驻 QuoteMaster!</h2>
+            <p className="text-slate-500 text-sm leading-relaxed mb-8">已为您充值 <strong className="text-blue-600 text-lg">15 次</strong> 旗舰版 AI 极速核价特权。<br/>无需绑定信用卡，立刻感受 30 秒出单的震撼。</p>
+            <button onClick={handleClaimGift} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
+              <Sparkles size={18} /> 立即开启我的首单测算
+            </button>
+            <button onClick={() => { localStorage.setItem('giftClaimed', 'true'); setShowGiftModal(false); }} className="mt-4 text-xs text-slate-400 hover:text-slate-600 font-medium">稍后使用</button>
           </div>
         </div>
       )}
