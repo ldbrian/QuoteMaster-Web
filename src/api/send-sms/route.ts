@@ -7,8 +7,8 @@ export async function POST(req: Request) {
 
     // ⚠️ 警告：跑通之后记得去阿里云重置密码并在这里替换！
     var client = new Core({
-      accessKeyId: 'LTAI5tND7jYJhwjB28vtVoy2',
-      accessKeySecret: '8iKxK2FKb2ktQOxJIakru1RrBQpnlF',
+      accessKeyId: process.env.ALIYUN_ACCESS_KEY_ID,
+      accessKeySecret: process.env.ALIYUN_ACCESS_KEY_SECRET,
       endpoint: 'https://dypnsapi.aliyuncs.com',
       apiVersion: '2017-05-25'
     });
