@@ -119,14 +119,20 @@ export default function Dashboard() {
     }
     setIsSending(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: '+86' + phoneNumber,
+      // 🌟 CTO 换炮：调用我们刚才写的阿里云 API
+      const res = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneNumber })
       });
-      if (error) throw error;
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || "发送失败，请检查手机号是否已在阿里云后台绑定测试名单");
+      
       setCountdown(60); 
-      alert("验证码已发送，请注意查收！(测试阶段若未收到，请检查后台短信配置)");
+      alert("验证码已火速发出，请查看手机！");
     } catch (error: any) {
-      alert('发送失败，请稍后再试。');
+      alert(error.message);
     } finally {
       setIsSending(false);
     }
@@ -139,35 +145,41 @@ export default function Dashboard() {
     }
     setIsVerifying(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone: '+86' + phoneNumber,
-        token: otpCode,
-        type: 'sms',
-      });
-      if (error) throw error;
-      const newBonus = (profile.bonus_quota || 0) + 5;
-      const { error: updateError } = await supabase.from('profiles').update({ 
-        phone_verified: true, 
-        phone: phoneNumber,
-        bonus_quota: newBonus 
-      }).eq('id', user.id);
-      if (updateError) throw updateError;
-
-      alert("🎉 绑定成功！已为您下发 5 次专属奖励额度！");
-      fetchUserProfile(user.id); 
-      setShowPhoneModal(false);
-      setShowTaskModal(false);
-      
-    } catch (error: any) {
+      // 💡 测试后门依旧保留，方便你没话费的时候测逻辑
       if (otpCode === '888888') {
         const newBonus = (profile.bonus_quota || 0) + 5;
         await supabase.from('profiles').update({ phone_verified: true, phone: phoneNumber, bonus_quota: newBonus }).eq('id', user.id);
         alert("🎉 [测试通道] 绑定成功！已为您下发 5 次专属奖励额度！");
         fetchUserProfile(user.id);
         setShowPhoneModal(false);
-      } else {
-        alert("验证码错误或已过期！(测试可使用 888888)");
+        return;
       }
+
+      // 🌟 CTO 换炮：调用阿里云验证 API
+      const res = await fetch('/api/verify-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneNumber, code: otpCode })
+      });
+      const data = await res.json();
+      
+      if (!res.ok || !data.success) throw new Error(data.message || "验证码错误或已过期");
+
+      // 验证成功！写入数据库发奖励！
+      const newBonus = (profile.bonus_quota || 0) + 5;
+      await supabase.from('profiles').update({ 
+        phone_verified: true, 
+        phone: phoneNumber,
+        bonus_quota: newBonus 
+      }).eq('id', user.id);
+
+      alert("🎉 绑定成功！真实的 5 次奖励额度已下发！");
+      fetchUserProfile(user.id); 
+      setShowPhoneModal(false);
+      setShowTaskModal(false);
+      
+    } catch (error: any) {
+      alert(error.message);
     } finally {
       setIsVerifying(false);
     }

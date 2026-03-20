@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Upload, Loader2, Trash2, Sparkles, PlayCircle } from 'lucide-react'; // 🌟 引入新图标
+import React, { useState, useEffect } from 'react';
+import { X, Upload, Loader2, Trash2, Sparkles, PlayCircle } from 'lucide-react'; 
 import { supabase } from '@/src/utils/supabase/client'; 
 import imageCompression from 'browser-image-compression';
 
-// 🌟 核心机密：提前焊死的完美演示数据（放在组件外部，纯净加载）
+// 🌟 核心机密：提前焊死的完美演示数据
 const DEMO_CASES = [
   {
     id: "demo-1",
@@ -75,7 +75,6 @@ interface NewQuoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  // 🌟 新增一个 Prop：当用户点击演示时，把数据传给父组件
   onSelectDemo?: (demoData: any) => void; 
 }
 
@@ -85,6 +84,20 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
   const [files, setFiles] = useState<File[]>([]); 
   const [note, setNote] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // 🌟 CTO：拉取当前用户的 ID，用于后续扣费
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUserId(session.user.id);
+      }
+    };
+    if (isOpen) {
+      fetchUser();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -103,6 +116,8 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
 
   const handleSubmit = async () => {
     if (files.length === 0) return alert('请至少上传一张产品图片');
+    if (!userId) return alert('用户身份异常，请刷新页面重试');
+    
     setUploading(true);
 
     try {
@@ -147,25 +162,33 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
 
       if (dbError) throw dbError;
 
-      let res;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          res = await fetch("https://api.toughlove.online/api/get_quote", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              inquiry_id: newInquiry.id,
-              image_urls: imageUrls, 
-              user_prompt: note
-            }),
-          });
-          
-          if (res.ok) break;
-          throw new Error(`状态码异常: ${res.status}`);
-        } catch (error) {
-          if (attempt === 3) throw error; 
-          await new Promise(resolve => setTimeout(resolve, 500)); 
+      // 🌟 CTO 核心修改：请求 AI，成功受理后才执行扣费
+      const res = await fetch("https://api.toughlove.online/api/get_quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inquiry_id: newInquiry.id,
+          image_urls: imageUrls, 
+          user_prompt: note
+        }),
+      });
+      
+      if (!res.ok) {
+        throw new Error(`API_ERROR: ${res.status}`); // 如果网络请求不OK，直接抛出异常跳过扣费！
+      }
+
+      // 🌟 请求成功受理！执行额度扣除逻辑 (调用后端 RPC 增加 usage_count)
+      const { error: rpcError } = await supabase.rpc('increment_usage_count', { user_id: userId });
+      if (rpcError) {
+        console.error("扣费执行失败:", rpcError);
+        // 如果你的数据库里还没有建这个 increment_usage_count 的 RPC 函数，
+        // 这里提供一个后备更新方案：
+        /*
+        const { data: profile } = await supabase.from('profiles').select('usage_count').eq('id', userId).single();
+        if (profile) {
+          await supabase.from('profiles').update({ usage_count: (profile.usage_count || 0) + 1 }).eq('id', userId);
         }
+        */
       }
 
       onSuccess();
@@ -175,7 +198,8 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
       
     } catch (error: any) {
       console.error('Full error:', error);
-      alert('上传或分析失败: ' + (error.message || '未知错误'));
+      // 🌟 CTO 核心修改：温柔版网络/拥堵报错
+      alert('🤖 哎呀，当前全球使用人数较多，AI 算力通道暂时拥堵啦！请喝口水稍等片刻再到列表中点击“重新测算”哦~');
       setUploading(false);
     } 
   };
@@ -258,7 +282,6 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
               <p className="text-sm font-bold text-slate-700">没图片？点这里体验极速秒算</p>
             </div>
             
-            {/* 横向滚动容器，隐藏滚动条 */}
             <div className="flex overflow-x-auto gap-3 pb-2 snap-x" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {DEMO_CASES.map((demo) => (
                 <div 
@@ -266,7 +289,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
                   onClick={() => {
                     if (onSelectDemo) {
                       onSelectDemo(demo.quoteData);
-                      onClose(); // 点完自动关闭上传弹窗
+                      onClose(); 
                     }
                   }}
                   className="shrink-0 w-[140px] group relative rounded-xl overflow-hidden cursor-pointer snap-start border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all bg-slate-50"
