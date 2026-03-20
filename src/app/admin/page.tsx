@@ -19,7 +19,7 @@ export default function AdminDashboard() {
         return;
       }
       // ⚠️ 极简权限控制：这里写死你的老板邮箱
-      if (session.user.email !== '你的老板邮箱@xxx.com') {
+      if (session.user.email !== 'ldbrian@163.com') {
         alert("非法访问：您不是管理员！");
         router.push('/');
         return;
