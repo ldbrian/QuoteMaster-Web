@@ -6,8 +6,8 @@ export async function POST(req: Request) {
     const { phone, code } = await req.json();
 
     var client = new Core({
-      accessKeyId: 'LTAI5tND7jYJhwjB28vtVoy2',
-      accessKeySecret: '8iKxK2FKb2ktQOxJIakru1RrBQpnlF',
+      accessKeyId: process.env.ALIYUN_ACCESS_KEY_ID,
+      accessKeySecret: process.env.ALIYUN_ACCESS_KEY_SECRET,
       endpoint: 'https://dypnsapi.aliyuncs.com',
       apiVersion: '2017-05-25'
     });
