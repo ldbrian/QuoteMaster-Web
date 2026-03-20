@@ -119,15 +119,23 @@ export default function Dashboard() {
     }
     setIsSending(true);
     try {
-      // 🌟 CTO 换炮：调用我们刚才写的阿里云 API
       const res = await fetch('/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phoneNumber })
       });
+      
+      // 🌟 CTO 防弹补丁：先检查后端是不是按套路出牌给了 JSON
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const textError = await res.text();
+        console.error("【后端崩溃原话】:", textError);
+        throw new Error("后端服务器罢工了，请切回 VS Code 看终端里的红字报错！");
+      }
+
       const data = await res.json();
       
-      if (!res.ok) throw new Error(data.error || "发送失败，请检查手机号是否已在阿里云后台绑定测试名单");
+      if (!res.ok) throw new Error(data.error || "发送失败，请检查阿里云配置");
       
       setCountdown(60); 
       alert("验证码已火速发出，请查看手机！");
