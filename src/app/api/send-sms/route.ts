@@ -4,53 +4,36 @@ import Core from '@alicloud/pop-core';
 export async function POST(req: Request) {
   try {
     const { phone } = await req.json();
+    if (!phone) return NextResponse.json({ error: '手机号不能为空' }, { status: 400 });
 
-    if (!phone) {
-      return NextResponse.json({ error: '手机号不能为空' }, { status: 400 });
-    }
-
-    // 1. 生成 6 位随机验证码
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // 2. 初始化阿里云 SDK
-    // ⚠️ 确保你的 .env.local 里有这四个变量
     const client = new Core({
       accessKeyId: process.env.ALIYUN_ACCESS_KEY_ID!,
       accessKeySecret: process.env.ALIYUN_ACCESS_KEY_SECRET!,
-      endpoint: 'https://dysmsapi.aliyuncs.com', // ⚠️ 已经帮你改成正确的短信网关了
+      endpoint: 'https://dypnsapi.aliyuncs.com', // ⚠️ 核心：换回个人免认证的网关
       apiVersion: '2017-05-25'
     });
 
-    // 3. 构造请求参数
     const params = {
-      "PhoneNumbers": phone,
-      "SignName": process.env.ALIYUN_SMS_SIGN_NAME,       
-      "TemplateCode": process.env.ALIYUN_SMS_TEMPLATE_CODE,   
-      // ⚠️ 核心修改：必须同时传 code 和 min 两个变量！
-      "TemplateParam": JSON.stringify({ code: otpCode, min: "5" })  
-    };
-    const requestOption = { 
-      method: 'POST' as const,
-      timeout: 10000 // ⚠️ 核心：增加 10 秒的超时等待时间
+      "PhoneNumber": phone, // ⚠️ 注意：系统A叫 PhoneNumber，没有 s
+      "SignName": "云渚科技验证平台", // ⚠️ 直接写死系统A给你的签名
+      "TemplateCode": "100001",     // ⚠️ 直接写死系统A给你的模板
+      "TemplateParam": JSON.stringify({ code: otpCode }) // 加上了刚才漏掉的数字！
     };
 
-    // 4. 正式向阿里云发射！
-    const result: any = await client.request('SendSms', params, requestOption);
+    // ⚠️ 系统A的发射动作叫 SendSmsVerifyCode 
+    const requestOption = { method: 'POST' as const, timeout: 10000 };
+    const result: any = await client.request('SendSmsVerifyCode', params, requestOption);
 
     if (result.Code !== 'OK') {
       throw new Error(result.Message || '阿里云返回错误状态');
     }
 
-    // ==========================================
-    // 🚨 注意：这里你需要把 phone 和 otpCode 存到数据库里
-    // 比如存进 Supabase 的 otp_codes 表，或者直接更新进 profiles 表
-    // 这样验证接口 /api/verify-sms 才知道客户填的对不对
-    // ==========================================
-
     return NextResponse.json({ success: true, message: '短信发送成功' });
 
   } catch (error: any) {
     console.error("阿里云短信发送崩溃:", error);
-    return NextResponse.json({ error: error.message || '短信发送失败，请联系管理员' }, { status: 500 });
+    return NextResponse.json({ error: error.message || '短信发送失败' }, { status: 500 });
   }
 }
