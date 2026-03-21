@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       "PhoneNumber": phone, // ⚠️ 注意：系统A叫 PhoneNumber，没有 s
       "SignName": "云渚科技验证平台", // ⚠️ 直接写死系统A给你的签名
       "TemplateCode": "100001",     // ⚠️ 直接写死系统A给你的模板
-      "TemplateParam": JSON.stringify({ code: otpCode }) // 加上了刚才漏掉的数字！
+      "TemplateParam": JSON.stringify({ code: otpCode, min: "5" }) // 加上了刚才漏掉的数字！
     };
 
     // ⚠️ 系统A的发射动作叫 SendSmsVerifyCode 
