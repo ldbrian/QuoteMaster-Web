@@ -29,7 +29,10 @@ export async function POST(req: Request) {
       // ⚠️ 核心修改：必须同时传 code 和 min 两个变量！
       "TemplateParam": JSON.stringify({ code: otpCode, min: "5" })  
     };
-    const requestOption = { method: 'POST' as const };
+    const requestOption = { 
+      method: 'POST' as const,
+      timeout: 10000 // ⚠️ 核心：增加 10 秒的超时等待时间
+    };
 
     // 4. 正式向阿里云发射！
     const result: any = await client.request('SendSms', params, requestOption);
