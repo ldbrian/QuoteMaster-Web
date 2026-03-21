@@ -24,11 +24,11 @@ export async function POST(req: Request) {
     // 3. 构造请求参数
     const params = {
       "PhoneNumbers": phone,
-      "SignName": process.env.ALIYUN_SMS_SIGN_NAME,       // 你的测试签名
-      "TemplateCode": process.env.ALIYUN_SMS_TEMPLATE_CODE,   // 你的测试模板 CODE
-      "TemplateParam": JSON.stringify({ code: otpCode })  // ⚠️ 修复报错的核心：把验证码传给模板里的 ${code}
+      "SignName": process.env.ALIYUN_SMS_SIGN_NAME,       
+      "TemplateCode": process.env.ALIYUN_SMS_TEMPLATE_CODE,   
+      // ⚠️ 核心修改：必须同时传 code 和 min 两个变量！
+      "TemplateParam": JSON.stringify({ code: otpCode, min: "5" })  
     };
-
     const requestOption = { method: 'POST' as const };
 
     // 4. 正式向阿里云发射！
