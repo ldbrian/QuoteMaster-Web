@@ -29,6 +29,17 @@ export async function POST(req: Request) {
     if (result.Code !== 'OK') {
       throw new Error(result.Message || '阿里云返回错误状态');
     }
+    if (result.Code !== 'OK') {
+      throw new Error(result.Message || '阿里云返回错误状态');
+    }
+
+    // 👇 把下面这段新的记账代码加在这里 👇
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY // 注意：这里必须用超级管理员钥匙
+    );
+    await supabase.from('otp_codes').insert([{ phone, code: otpCode }]);
 
     return NextResponse.json({ success: true, message: '短信发送成功' });
 
