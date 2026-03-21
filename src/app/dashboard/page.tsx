@@ -181,7 +181,7 @@ export default function Dashboard() {
       const res = await fetch('/api/verify-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneNumber, code: otpCode })
+        body: JSON.stringify({ phone: phoneNumber, code: otpCode, userId: user?.id })
       });
       
       const data = await res.json();
