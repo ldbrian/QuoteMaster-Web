@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { X, Edit2, Save, AlertCircle, DollarSign, Calculator, FileText, MessageSquareQuote, Loader2, Send, Download, ShieldAlert } from "lucide-react";
 import ExportPreviewModal from './ExportPreviewModal'; 
+import ProfitCalculator from './ProfitCalculator';
 
 interface BOMItem {
   id?: string;
@@ -293,7 +294,13 @@ Best regards,
                 </table>
               </div>
             </div>
-
+            {/* 🌟 核心护城河：隐形利润核算器 (上帝视角) */}
+            <div className="pt-2 pb-4">
+              <ProfitCalculator 
+                // 自动把 BOM 的 USD 总和乘以 7.2，作为工厂 RMB 底价的默认初始值
+                defaultCostRMB={editableBom.reduce((sum, item) => sum + (Number(item.cost) || 0), 0) * 7.2} 
+              />
+            </div>
             <div>
               <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5 mb-3">
                 <MessageSquareQuote className="w-4 h-4" /> 推荐回复话术 (草稿)

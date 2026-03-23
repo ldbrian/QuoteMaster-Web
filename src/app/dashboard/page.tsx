@@ -466,6 +466,7 @@ export default function Dashboard() {
             </div>
             
             <div className="p-6 space-y-4 bg-slate-50">
+            {/* 🛑 CTO 物理屏蔽：暂时隐藏手机绑定任务，防测试摩擦
               <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between hover:border-blue-300 transition-colors shadow-sm">
                 <div className="flex items-center gap-4">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${profile?.phone_verified ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
@@ -487,6 +488,7 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
+              */}
 
               <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between hover:border-purple-300 transition-colors shadow-sm">
                 <div className="flex items-center gap-4">
@@ -539,6 +541,7 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* 🛑 CTO 物理屏蔽：暂时隐藏手机号验证弹窗
       {showPhoneModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-sm w-full rounded-2xl shadow-2xl overflow-hidden relative">
@@ -575,7 +578,8 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
+      */}
+      
       {/* 🌟 核心升级：贡献底价弹窗（增加时效拦截） */}
       {showUploadQuoteModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
