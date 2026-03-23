@@ -332,7 +332,7 @@ export default function QuoteDetailPanel({
                 </div>
 
                 {/* 3. 修改点 3：把原先固定在底部的汇总区，移进来了，跟计算器无缝衔接 */}
-                <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm mt-auto">
+                <div className="sticky bottom-0 z-20 bg-white/95 backdrop-blur-xl border border-blue-100 p-6 rounded-2xl shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.15)] mt-auto transform translate-y-1">
                   
                   <div className="mb-5 pb-5 border-b border-slate-100 flex justify-between items-center">
                     <div>
