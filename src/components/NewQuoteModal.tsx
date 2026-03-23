@@ -114,6 +114,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
     setFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  // 🌟 覆盖替换 handleSubmit 函数
   const handleSubmit = async () => {
     if (files.length === 0) return alert('请至少上传一张产品图片');
     if (!userId) return alert('用户身份异常，请刷新页面重试');
@@ -121,75 +122,38 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
     setUploading(true);
 
     try {
-      const options = {
-        maxSizeMB: 0.5, 
-        maxWidthOrHeight: 1920, 
-        useWebWorker: true,
-        fileType: 'image/jpeg', 
-        initialQuality: 0.8     
-      };
-      
+      // ... (保留前面压缩和上传图片的代码，不要动) ...
+      const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/jpeg', initialQuality: 0.8 };
       const compressedFiles = await Promise.all(files.map(file => imageCompression(file, options)));
 
       const uploadPromises = compressedFiles.map(async (compressedFile, index) => {
         const fileName = `${Date.now()}-${index}.jpg`;
-        const { data, error } = await supabase.storage
-          .from('inquiry-images')
-          .upload(fileName, compressedFile);
-
+        const { error } = await supabase.storage.from('inquiry-images').upload(fileName, compressedFile);
         if (error) throw error;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('inquiry-images')
-          .getPublicUrl(fileName);
-          
+        const { data: { publicUrl } } = supabase.storage.from('inquiry-images').getPublicUrl(fileName);
         return publicUrl;
       });
-
       const imageUrls = await Promise.all(uploadPromises);
 
+      // 🌟 核心：直接插入数据库，把用户的备注也存进去。状态设为 analyzing，唤醒后台 Worker！
       const { data: newInquiry, error: dbError } = await supabase
         .from('inquiries')
         .insert({
           product_name: '分析中...', 
           source: '工作台上传',
-          status: 'analyzing',
+          status: 'analyzing',  // <--- 极其关键的触发开关
           thumbnail_url: imageUrls[0], 
-          image_urls: imageUrls 
+          image_urls: imageUrls,
+          user_prompt: note     // 把用户写的需求传给 Worker
         })
         .select()
         .single();
 
       if (dbError) throw dbError;
 
-      // 🌟 CTO 核心修改：请求 AI，成功受理后才执行扣费
-      const res = await fetch("https://api.toughlove.online/api/get_quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inquiry_id: newInquiry.id,
-          image_urls: imageUrls, 
-          user_prompt: note
-        }),
-      });
-      
-      if (!res.ok) {
-        throw new Error(`API_ERROR: ${res.status}`); // 如果网络请求不OK，直接抛出异常跳过扣费！
-      }
-
-      // 🌟 请求成功受理！执行额度扣除逻辑 (调用后端 RPC 增加 usage_count)
+      // 🌟 扣费执行
       const { error: rpcError } = await supabase.rpc('increment_usage_count', { user_id: userId });
-      if (rpcError) {
-        console.error("扣费执行失败:", rpcError);
-        // 如果你的数据库里还没有建这个 increment_usage_count 的 RPC 函数，
-        // 这里提供一个后备更新方案：
-        /*
-        const { data: profile } = await supabase.from('profiles').select('usage_count').eq('id', userId).single();
-        if (profile) {
-          await supabase.from('profiles').update({ usage_count: (profile.usage_count || 0) + 1 }).eq('id', userId);
-        }
-        */
-      }
+      if (rpcError) console.error("扣费执行失败:", rpcError);
 
       onSuccess();
       onClose();
@@ -198,8 +162,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
       
     } catch (error: any) {
       console.error('Full error:', error);
-      // 🌟 CTO 核心修改：温柔版网络/拥堵报错
-      alert('🤖 哎呀，当前全球使用人数较多，AI 算力通道暂时拥堵啦！请喝口水稍等片刻再到列表中点击“重新测算”哦~');
+      alert('网络或上传异常，请重试');
       setUploading(false);
     } 
   };

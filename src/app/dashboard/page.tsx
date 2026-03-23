@@ -232,33 +232,35 @@ export default function Dashboard() {
     }
   };
 
+  // 🌟 覆盖替换原来的 handleRetry 函数
   const handleRetry = async (lead: any, e: React.MouseEvent) => {
     e.stopPropagation(); 
     if (profile && profile.tier === 'free' && remainingQuota <= 0) {
       setShowPayModal(true);
       return; 
     }
+    
     const nowISO = new Date().toISOString();
+    // 1. 界面秒变 Loading 状态
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'analyzing', created_at: nowISO } : l));
-    await supabase.from('inquiries').update({ status: 'analyzing', created_at: nowISO }).eq('id', lead.id);
     
     try {
-      const response = await fetch("https://api.toughlove.online/api/get_quote", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-  inquiry_id: lead.id, 
-  image_urls: [lead.thumbnail_url], // 👈 改成 image_urls，并用中括号 [] 包起来！
-  user_prompt: "重试核价任务" 
-}),
-      });
-      if (!response.ok) throw new Error("API_ERROR");
+      // 🌟 2. 拔掉 API，直接更新数据库，后台 Worker 看到 analyzing 就会像饿狼一样扑上去算！
+      const { error } = await supabase.from('inquiries').update({ 
+        status: 'analyzing', 
+        created_at: nowISO,
+        user_prompt: "重试核价任务" 
+      }).eq('id', lead.id);
 
+      if (error) throw error;
+
+      // 3. 扣除额度
       const newUsage = (profile?.usage_count || 0) + 1;
       await supabase.from('profiles').update({ usage_count: newUsage }).eq('id', user.id);
       if(user) fetchUserProfile(user.id);
 
     } catch (error) {
-      alert("🤖 哎呀，当前全球使用人数较多，AI 算力通道暂时拥堵啦！请喝口水稍等一分钟再试哦~");
+      alert("网络异常，无法召唤 AI，请重试！");
       setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'failed' } : l));
       await supabase.from('inquiries').update({ status: 'failed' }).eq('id', lead.id);
     }
