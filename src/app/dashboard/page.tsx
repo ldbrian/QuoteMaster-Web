@@ -245,7 +245,11 @@ export default function Dashboard() {
     try {
       const response = await fetch("https://api.toughlove.online/api/get_quote", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inquiry_id: lead.id, image_url: lead.thumbnail_url, user_prompt: "重试核价任务" }),
+        body: JSON.stringify({ 
+  inquiry_id: lead.id, 
+  image_urls: [lead.thumbnail_url], // 👈 改成 image_urls，并用中括号 [] 包起来！
+  user_prompt: "重试核价任务" 
+}),
       });
       if (!response.ok) throw new Error("API_ERROR");
 
