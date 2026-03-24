@@ -5,7 +5,7 @@ import { X, Upload, Loader2, Trash2, Sparkles, PlayCircle } from 'lucide-react';
 import { supabase } from '@/src/utils/supabase/client'; 
 import imageCompression from 'browser-image-compression';
 
-// 🌟 核心机密：已同步最新 A/B/C 三阶方案架构的完美演示数据
+// 🌟 核心机密：提前焊死的完美演示数据 (已升级至 v2 动态多方案引擎架构)
 const DEMO_CASES = [
   {
     id: "demo-1",
@@ -14,73 +14,61 @@ const DEMO_CASES = [
     quoteData: {
       id: "demo-q-1",
       product_name: "Premium Cotton Baseball Cap with 3D Embroidery",
-      analysis_reasoning: "通过图像分析：材质为高克重纯棉斜纹布，正面含高密度 3D 立体刺绣 Logo。整体工艺属于中高端品质，已为您生成三阶核价方案。",
+      analysis_reasoning: "诊断：典型的欧美街头高街风 (Streetwear)，目前在 TikTok 搜索热度极高。材质为高克重纯棉斜纹布，正面含高密度 3D 立体刺绣 Logo。整体工艺属于中高端品质，已为您生成高低搭配两套方案以锁定不同预算的客户。",
       plans: {
         plan_a: {
-          name: "Plan A (Cost-Effective / 极致性价比)",
-          simplified_materials: "Standard cotton twill, regular flat embroidery instead of 3D, plastic buckle.",
-          fob_price_range: "$1.40 - $1.60",
-          moq: 2000,
-          bom: [{ name: "Standard Cotton", cost: 0.30 }, { name: "Flat Embroidery", cost: 0.15 }, { name: "Plastic Buckle", cost: 0.05 }, { name: "Labor", cost: 0.40 }],
-          margin: 0.35,
-          factory_pitch: "工厂沟通：用常规全棉纱卡，刺绣改平绣，走电商跑量大货标准。"
+          name: "方案 A (标准原版还原)",
+          simplified_materials: "Premium 100% heavy cotton twill, high-density 3D embroidery logo, custom metal adjustable buckle. Perfect for high-end retail.",
+          moq: 1000,
+          bom: [
+            { name: "100% Cotton Twill Fabric (纯棉斜纹面料)", cost: 0.45 },
+            { name: "3D Logo Embroidery (正面立体刺绣)", cost: 0.35 },
+            { name: "Metal Buckle & Eyelets (金属调节扣与透气孔)", cost: 0.15 },
+            { name: "Cut & Sew Labor (裁剪与车缝人工)", cost: 0.60 }
+          ],
+          margin: 0.45,
+          final_price: 2.80,
+          factory_pitch: "老板，这个单子客户要求很高，严格按原版品质做。面料必须是纯棉重磅斜纹，3D刺绣要饱满不能露底。五金做无镍电镀。做好了后续翻单很大。"
         },
         plan_b: {
-          name: "Plan B (Standard / 标准还原)",
-          simplified_materials: "Premium 100% cotton twill, high-density 3D logo embroidery, metal adjustable buckle.",
-          fob_price_range: "$2.10 - $2.40",
-          moq: 1000,
-          bom: [{ name: "Premium Cotton Twill", cost: 0.45 }, { name: "3D Embroidery", cost: 0.35 }, { name: "Metal Buckle", cost: 0.15 }, { name: "Labor", cost: 0.60 }],
-          margin: 0.45,
-          factory_pitch: "工厂沟通：严格按照原图还原，3D刺绣要饱满，五金配件用防锈电镀。"
-        },
-        plan_c: {
-          name: "Plan C (Premium / 高端品牌线)",
-          simplified_materials: "Heavyweight brushed cotton, 3D embroidery with custom inner taping and branded tags.",
-          fob_price_range: "$3.20 - $3.80",
-          moq: 500,
-          bom: [{ name: "Heavyweight Cotton", cost: 0.65 }, { name: "Complex 3D Embroidery", cost: 0.50 }, { name: "Custom Taping & Tags", cost: 0.45 }, { name: "Premium Labor", cost: 0.80 }],
-          margin: 0.55,
-          factory_pitch: "工厂沟通：走精品线，内里做全包边印logo，所有走线必须完美，按日本单质检标准。"
+          name: "方案 B (电商跑量平替版)",
+          simplified_materials: "Standard cotton twill, flat embroidery logo, plastic snapback closure. Cost-effective option for promotional events.",
+          moq: 3000,
+          bom: [
+            { name: "T/C Twill Fabric (涤棉斜纹面料)", cost: 0.25 },
+            { name: "Flat Embroidery (普通平绣)", cost: 0.15 },
+            { name: "Plastic Snapback (塑料排扣)", cost: 0.05 },
+            { name: "Cut & Sew Labor (裁剪与车缝人工)", cost: 0.45 }
+          ],
+          margin: 0.35,
+          final_price: 1.38,
+          factory_pitch: "走跨境电商的跑量单，价格压得很死。面料换成便宜的涤棉，刺绣改成普通平绣，后扣换塑料的。车工不需要太精细，别有大瑕疵就行，帮我把成本卡在 6 块钱人民币以内。"
         }
       }
     }
   },
   {
     id: "demo-2",
-    title: "不锈钢保温杯",
-    image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=400&q=80",
+    title: "黄麻托特包",
+    image: "https://images.unsplash.com/photo-1597348989645-46b190ce4918?auto=format&fit=crop&w=400&q=80",
     quoteData: {
-      id: "demo-q-2",
-      product_name: "500ml Stainless Steel Vacuum Flask",
-      analysis_reasoning: "通过图像分析：杯身采用双层不锈钢抽真空工艺，带有定制硅胶套。开模成本较高。",
+      id: "demo-q-3",
+      product_name: "Eco-friendly Jute Tote Bag",
+      analysis_reasoning: "诊断：典型的环保快消促销品 (Eco-Promo)。结构简单，主拼人工与走量。客户预算明确，因此仅提供 1 套跑量极致性价比方案。",
       plans: {
         plan_a: {
-          name: "Plan A (Cost-Effective)",
-          simplified_materials: "201 Stainless steel outer, 304 inner, standard painted finish.",
-          fob_price_range: "$2.80 - $3.20",
-          moq: 3000,
-          bom: [{ name: "201/304 Steel", cost: 1.20 }, { name: "Standard Paint", cost: 0.20 }, { name: "Labor", cost: 0.80 }],
-          margin: 0.30,
-          factory_pitch: "工厂沟通：外201内304，普通喷漆，不带硅胶套，冲价格底线。"
-        },
-        plan_b: {
-          name: "Plan B (Standard)",
-          simplified_materials: "Double wall 304 stainless steel, powder coating, silicone sleeve.",
-          fob_price_range: "$4.50 - $4.90",
-          moq: 1500,
-          bom: [{ name: "Dual 304 Steel", cost: 1.80 }, { name: "Powder Coating", cost: 0.35 }, { name: "Silicone Sleeve", cost: 0.65 }, { name: "Labor", cost: 0.80 }],
-          margin: 0.40,
-          factory_pitch: "工厂沟通：内外304，哑光喷塑，硅胶套开模具，保证过 FDA 测试。"
-        },
-        plan_c: {
-          name: "Plan C (Premium)",
-          simplified_materials: "316 Medical grade stainless steel inner, ceramic coating, custom sleeve.",
-          fob_price_range: "$6.50 - $7.20",
-          moq: 1000,
-          bom: [{ name: "316 Inner/304 Outer", cost: 2.50 }, { name: "Ceramic Inner Coating", cost: 0.90 }, { name: "Premium Sleeve", cost: 0.80 }, { name: "Labor", cost: 1.00 }],
-          margin: 0.50,
-          factory_pitch: "工厂沟通：内胆升级316加陶瓷涂层，保温保冷时效要求达到 24 小时以上。"
+          name: "极致性价比版 (跑量)",
+          simplified_materials: "100% Natural Jute fabric with PE inner lamination for water resistance. Soft cotton webbing handles. Ideal for grocery shopping and eco-promotions.",
+          moq: 5000,
+          bom: [
+            { name: "Natural Jute w/ PE Lamination (黄麻布含覆膜)", cost: 0.65 },
+            { name: "Cotton Webbing Handles (纯棉手提带)", cost: 0.25 },
+            { name: "1-Color Silkscreen Print (单色丝网印刷)", cost: 0.12 },
+            { name: "Sewing Labor (车缝人工)", cost: 0.35 }
+          ],
+          margin: 0.25,
+          final_price: 1.82,
+          factory_pitch: "展会急单，一次性发 5000 个。不需要精细包装，大货直接蛇皮袋捆扎装箱。印刷只要不掉色就行。厂长给我个最低包工包料底价，这单全靠走量赚钱。"
         }
       }
     }

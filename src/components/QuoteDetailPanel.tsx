@@ -339,9 +339,29 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
           </div>
         )}
 
-        {/* --- 沉浸式重算弹窗 (Overlay Modal) --- */}
+        
+
+      </div>
+      
+      {/* --- 底部全局操作栏 --- */}
+      {isAnalyzed && localQuote?.plans && (
+        <div className="border-t border-slate-200 bg-white p-4 shrink-0 flex items-center justify-between gap-4">
+          <button onClick={handleSaveChanges} disabled={isSaving} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-200 transition-colors flex items-center gap-2">
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 保存
+          </button>
+          <div className="flex items-center gap-3">
+            <button className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-lg text-sm hover:bg-emerald-100 transition-colors flex items-center gap-2">
+              <Download className="w-4 h-4" /> Excel
+            </button>
+            <button onClick={() => alert('此功能对接 ExportPreviewModal')} className="px-5 py-2 bg-blue-600 text-white font-bold rounded-lg text-sm shadow-md hover:bg-blue-700 transition-all flex items-center gap-2">
+              <FileText className="w-4 h-4" /> 生成客户 PDF
+            </button>
+          </div>
+        </div>
+      )}
+      {/* --- 沉浸式重算弹窗 (Overlay Modal) --- */}
         {showRetryModal && (
-          <div className="absolute inset-0 z-10 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95">
               <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2"><RefreshCw className="w-4 h-4 text-indigo-600" /> 指令重算</h3>
@@ -368,25 +388,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
             </div>
           </div>
         )}
-
-      </div>
-      
-      {/* --- 底部全局操作栏 --- */}
-      {isAnalyzed && localQuote?.plans && (
-        <div className="border-t border-slate-200 bg-white p-4 shrink-0 flex items-center justify-between gap-4">
-          <button onClick={handleSaveChanges} disabled={isSaving} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-200 transition-colors flex items-center gap-2">
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 保存
-          </button>
-          <div className="flex items-center gap-3">
-            <button className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-lg text-sm hover:bg-emerald-100 transition-colors flex items-center gap-2">
-              <Download className="w-4 h-4" /> Excel
-            </button>
-            <button onClick={() => alert('此功能对接 ExportPreviewModal')} className="px-5 py-2 bg-blue-600 text-white font-bold rounded-lg text-sm shadow-md hover:bg-blue-700 transition-all flex items-center gap-2">
-              <FileText className="w-4 h-4" /> 生成客户 PDF
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
