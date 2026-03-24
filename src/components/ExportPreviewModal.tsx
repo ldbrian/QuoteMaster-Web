@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { X, Download, FileText, FileSpreadsheet, Printer, ShieldAlert } from 'lucide-react'; // 🌟 引入 ShieldAlert 图标
+import { X, FileText, FileSpreadsheet, Printer, ShieldCheck } from 'lucide-react'; 
 
 interface ExportPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  quoteData: any;
+  quoteData: any; // 现在接收的是包含 plans: { plan_a, plan_b, plan_c } 的新结构
 }
 
 export default function ExportPreviewModal({ isOpen, onClose, quoteData }: ExportPreviewModalProps) {
@@ -15,20 +15,17 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
   const [validDays, setValidDays] = useState('30');
   const [remarks, setRemarks] = useState('');
   const [isExportingPDF, setIsExportingPDF] = useState(false);
-  const [hideBOM, setHideBOM] = useState(false);
-  
-  // 🌟 新增：如果上一页传了 moq，直接回显，如果没有则默认 500
-  const [moq, setMoq] = useState(quoteData?.moq || '500'); 
 
   const previewRef = useRef<HTMLDivElement>(null);
 
-  if (!isOpen || !quoteData) return null;
+  if (!isOpen || !quoteData || !quoteData.plans) return null;
 
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  
   const validUntilDate = new Date();
   validUntilDate.setDate(validUntilDate.getDate() + parseInt(validDays));
   const validUntil = validUntilDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+  const planKeys = ['plan_a', 'plan_b', 'plan_c'] as const;
 
   const handleExportPDF = async () => {
     if (!previewRef.current) return;
@@ -46,12 +43,7 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
         backgroundColor: '#ffffff' 
       });
 
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (element.offsetHeight * pdfWidth) / element.offsetWidth;
 
@@ -66,47 +58,34 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
     }
   };
 
+  // 🌟 Excel 导出也严格执行数据防火墙，只导出清洗后的数据
   const handleExportExcel = async () => {
     try {
       const XLSX = await import('xlsx');
       
-      const excelData = (quoteData.bom || []).map((item: any) => ({
-        "项目明细 (Description)": item.item || item.name,
-        "预估单价 (Unit Price USD)": Number(item.cost).toFixed(2)
-      }));
-      
-      if (quoteData.margin > 0) {
-        excelData.push({
-          "项目明细 (Description)": "Premium / Risk Buffer",
-          "预估单价 (Unit Price USD)": Number(quoteData.margin).toFixed(2)
-        });
-      }
-      
-      excelData.push({
-        "项目明细 (Description)": "TOTAL FOB PRICE",
-        "预估单价 (Unit Price USD)": Number(quoteData.final_price).toFixed(2)
-      });
-
-      // 🌟 Excel 里也加上 MOQ
-      excelData.push({
-        "项目明细 (Description)": "Based on MOQ (pcs)",
-        "预估单价 (Unit Price USD)": moq
+      const excelData = planKeys.map((key) => {
+        const plan = quoteData.plans[key];
+        return {
+          "Option": plan.name,
+          "Material & Specs": plan.simplified_materials,
+          "MOQ (pcs)": plan.moq,
+          "Estimated FOB Price": plan.fob_price_range
+        };
       });
 
       const worksheet = XLSX.utils.json_to_sheet(excelData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Quotation");
       
+      // 调整列宽
+      worksheet['!cols'] = [{ wch: 30 }, { wch: 60 }, { wch: 15 }, { wch: 25 }];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Quoted Options");
       XLSX.writeFile(workbook, `Quotation_${styleNo || 'QM_Quote'}.xlsx`);
     } catch (error) {
       console.error("Excel 导出失败:", error);
       alert("Excel 生成失败，请检查依赖是否正确安装。");
     }
   };
-
-  // 计算安全区间
-  const minPrice = (Number(quoteData.final_price) * 0.85).toFixed(2);
-  const maxPrice = (Number(quoteData.final_price) * 1.15).toFixed(2);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 md:p-8 transition-opacity">
@@ -117,7 +96,7 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
           <div className="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-white">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <Printer className="w-5 h-5 text-blue-600" />
-              报价单生成配置
+              Client PDF Generator
             </h2>
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors md:hidden">
               <X className="w-5 h-5" />
@@ -125,6 +104,15 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            {/* 防火墙提示 */}
+            <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl flex items-start gap-3">
+              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-emerald-900">数据防火墙已激活</p>
+                <p className="text-xs text-emerald-700 mt-1 leading-relaxed">底价、工厂内控工艺单已自动隐藏。此文档处于“安全对外”模式。</p>
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Client / 客户抬头</label>
               <input 
@@ -147,45 +135,17 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Validity / 有效期</label>
-                <select 
-                  value={validDays}
-                  onChange={(e) => setValidDays(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                >
-                  <option value="15">15 Days</option>
-                  <option value="30">30 Days</option>
-                  <option value="60">60 Days</option>
-                </select>
-              </div>
-              {/* 🌟 新增：左侧控制台也可随时修改 MOQ */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">MOQ / 起订量</label>
-                <input 
-                  type="number" 
-                  value={moq}
-                  onChange={(e) => setMoq(e.target.value)}
-                  placeholder="500" 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="mt-4 p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl flex items-start gap-3 cursor-pointer transition-colors hover:bg-indigo-100/50" onClick={() => setHideBOM(!hideBOM)}>
-              <div className="mt-0.5">
-                <input 
-                  type="checkbox" 
-                  checked={hideBOM}
-                  readOnly
-                  className="w-4 h-4 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500 cursor-pointer pointer-events-none"
-                />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-indigo-900">对外隐藏 BOM 成本明细</p>
-                <p className="text-xs text-indigo-700 mt-1 leading-relaxed">勾选后，导出的 PDF 将折叠各项材料费用，仅展示最终 FOB 总价，完美保护利润空间。</p>
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Validity / 有效期</label>
+              <select 
+                value={validDays}
+                onChange={(e) => setValidDays(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              >
+                <option value="15">15 Days</option>
+                <option value="30">30 Days</option>
+                <option value="60">60 Days</option>
+              </select>
             </div>
 
             <div>
@@ -210,11 +170,11 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
               {isExportingPDF ? (
                 <>正在渲染高清文件，请稍候...</>
               ) : (
-                <><FileText className="w-4 h-4" /> 导出精美 PDF</>
+                <><FileText className="w-4 h-4" /> 导出净化版 PDF</>
               )}
             </button>
             <button onClick={handleExportExcel} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-lg flex justify-center items-center gap-2 shadow-sm transition-colors">
-              <FileSpreadsheet className="w-4 h-4" /> 导出可编辑 Excel
+              <FileSpreadsheet className="w-4 h-4" /> 导出安全版 Excel
             </button>
           </div>
         </div>
@@ -231,14 +191,14 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
             {/* A4 纸张容器 */}
             <div 
               ref={previewRef}
-              className="bg-white shadow-xl w-full max-w-[210mm] min-h-[297mm] p-8 md:p-12 text-slate-800 font-sans flex flex-col"
+              className="bg-white shadow-xl w-full max-w-[210mm] min-h-[297mm] p-8 md:p-12 text-slate-800 font-sans flex flex-col relative"
               style={{ aspectRatio: '210/297' }}
             >
               {/* 纸张头部 */}
-              <div className="flex justify-between items-start border-b-2 border-slate-800 pb-6 mb-8">
+              <div className="flex justify-between items-start border-b-2 border-slate-800 pb-6 mb-6">
                 <div>
-                  <h1 className="text-3xl font-black text-slate-900 tracking-tight">ESTIMATED QUOTATION</h1>
-                  <p className="text-sm font-medium text-slate-500 mt-1">QuoteMaster Technology Co., Ltd.</p>
+                  <h1 className="text-3xl font-black text-slate-900 tracking-tight">OFFICIAL QUOTATION</h1>
+                  <p className="text-sm font-medium text-slate-500 mt-1">Multi-tier Sourcing Strategy</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-slate-800">Date: <span className="font-normal">{today}</span></p>
@@ -255,89 +215,60 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Style No. / Item</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Item / Style</p>
                   <p className="text-base font-bold text-slate-800 border-b border-slate-200 pb-1 min-h-[1.5rem]">
                     {styleNo || quoteData.product_name || <span className="text-slate-300 italic">Please enter style no...</span>}
                   </p>
                 </div>
               </div>
 
-              {/* BOM 表格 */}
-              <div className="mb-8 flex-1">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Cost Breakdown (FOB Shanghai)</p>
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100 border-y border-slate-300">
-                      <th className="py-3 px-4 font-bold text-sm text-slate-700">Description</th>
-                      <th className="py-3 px-4 font-bold text-sm text-slate-700 text-right">Unit Price (USD)</th>
-                    </tr>
-                  </thead>
-                  
-                  {hideBOM ? (
-                    <tbody>
-                      <tr className="border-b border-slate-100">
-                        <td className="py-4 px-4 text-sm text-slate-600 italic">
-                          Product Manufacturing, Materials & Standard Packaging<br/>
-                          <span className="text-xs text-slate-400">(成品制造、材料与标准包装费用)</span>
-                        </td>
-                        <td className="py-4 px-4 text-sm text-slate-800 font-mono text-right text-opacity-50">Included</td>
-                      </tr>
-                    </tbody>
-                  ) : (
-                    <tbody>
-                      {quoteData.bom?.map((item: any, idx: number) => (
-                        <tr key={idx} className="border-b border-slate-100">
-                          <td className="py-3 px-4 text-sm text-slate-600">{item.item || item.name}</td>
-                          <td className="py-3 px-4 text-sm text-slate-800 font-mono text-right">${Number(item.cost).toFixed(2)}</td>
-                        </tr>
-                      ))}
-                      {quoteData.margin > 0 && (
-                        <tr className="border-b border-slate-100">
-                          <td className="py-3 px-4 text-sm text-slate-600">Premium / Risk Buffer</td>
-                          <td className="py-3 px-4 text-sm text-slate-800 font-mono text-right">${Number(quoteData.margin).toFixed(2)}</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  )}
-                  
-                  <tfoot>
-                    <tr className="border-b-2 border-slate-800">
-                      <td className="py-4 px-4 font-black text-slate-900 text-right uppercase">Total FOB Price:</td>
-                      <td className="py-4 px-4 font-black text-blue-700 text-xl font-mono text-right">
-                        ${Number(quoteData.final_price).toFixed(2)}
-                      </td>
-                    </tr>
-                    {/* 🌟 核心升级：紧跟在总价下方的 MOQ 和区间说明 */}
-                    <tr className="bg-slate-50">
-                      <td colSpan={2} className="py-2 px-4 text-right">
-                        <div className="flex justify-end items-center gap-4 text-xs font-medium">
-                          <span className="text-slate-600 bg-white px-2 py-1 rounded border border-slate-200">
-                            Based on MOQ: <strong className="text-slate-800">{moq} pcs</strong>
-                          </span>
-                          <span className="text-slate-600 flex items-center gap-1 bg-white px-2 py-1 rounded border border-slate-200">
-                            <ShieldAlert className="w-3.5 h-3.5 text-blue-500" />
-                            Estimated Range: <strong className="text-blue-600">${minPrice} - ${maxPrice}</strong>
-                          </span>
+              {/* A/B/C 三阶报价矩阵 */}
+              <div className="flex-1 mb-8">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Proposed Sourcing Options</p>
+                <div className="flex flex-col gap-5">
+                  {planKeys.map((key, index) => {
+                    const plan = quoteData.plans[key];
+                    if (!plan) return null;
+                    return (
+                      <div key={index} className="border border-slate-300 rounded-lg p-5 bg-slate-50/50">
+                        <div className="flex justify-between items-start mb-3">
+                          <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
+                          <div className="text-right">
+                            <span className="text-sm text-slate-500 mr-2">Est. FOB:</span>
+                            <span className="text-xl font-bold text-blue-700 font-mono">{plan.fob_price_range}</span>
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                        <p className="text-sm text-slate-600 mb-3 leading-relaxed">
+                          <strong>Materials & Specs:</strong> {plan.simplified_materials}
+                        </p>
+                        <div className="inline-block bg-white border border-slate-200 rounded px-3 py-1 text-sm font-medium text-slate-700">
+                          Requires MOQ: <span className="font-bold text-slate-900">{plan.moq} pcs</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* 额外备注 */}
               {remarks && (
-                <div className="mb-8">
+                <div className="mb-6">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Remarks</p>
                   <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded border border-slate-100 whitespace-pre-wrap">{remarks}</p>
                 </div>
               )}
 
-              {/* ⚠️ 终极免责声明 */}
-              <div className="mt-auto pt-8 border-t border-slate-200">
-                <p className="text-[10px] text-slate-400 font-medium leading-relaxed text-justify uppercase">
-                  <strong>DISCLAIMER:</strong> THIS QUOTATION IS ESTIMATED BY QUOTEMASTER AI BASED ON IMAGE ANALYSIS. PRICES ARE FOR REFERENCE ONLY (±15% VARIANCE) AND SUBJECT TO CHANGE BASED ON THE FINAL PHYSICAL SAMPLE AND THE STATED MOQ. FREIGHT COSTS (IF ANY) ARE SUBJECT TO REAL-TIME CONFIRMATION.
+              {/* ⚠️ 终极免责声明 & 水印 */}
+              <div className="mt-auto pt-6 border-t border-slate-200 relative">
+                <p className="text-[10px] text-slate-400 font-medium leading-relaxed text-justify uppercase pr-32">
+                  <strong>DISCLAIMER:</strong> THIS QUOTATION IS ESTIMATED AND SUBJECT TO FINAL CONFIRMATION BASED ON PHYSICAL COUNTER-SAMPLES. PRICES MAY FLUCTUATE DUE TO RAW MATERIAL COSTS AND CURRENCY EXCHANGE RATES.
                 </p>
+                {/* 🌟 品牌护城河：Slogan 水印 */}
+                <div className="absolute right-0 bottom-0">
+                  <p className="text-xs font-black text-slate-300 italic tracking-wide">
+                    Powered by QuoteMaster AI Engine™
+                  </p>
+                </div>
               </div>
 
             </div>
