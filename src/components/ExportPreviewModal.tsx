@@ -258,13 +258,19 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
                 </div>
               )}
 
-              {/* ⚠️ 终极免责声明 & 水印 */}
-              <div className="mt-auto pt-6 border-t border-slate-200 relative">
-                <p className="text-[10px] text-slate-400 font-medium leading-relaxed text-justify uppercase pr-32">
-                  <strong>DISCLAIMER:</strong> THIS QUOTATION IS ESTIMATED AND SUBJECT TO FINAL CONFIRMATION BASED ON PHYSICAL COUNTER-SAMPLES. PRICES MAY FLUCTUATE DUE TO RAW MATERIAL COSTS AND CURRENCY EXCHANGE RATES.
-                </p>
-                {/* 🌟 品牌护城河：Slogan 水印 */}
-                <div className="absolute right-0 bottom-0">
+              {/* ⚠️ 终极免责声明 & 水印 - 物理布局修复重叠版 */}
+              {/* 🔴 移除 relative，使用 flex 布局强行分离左右文字 */}
+              <div className="mt-auto pt-6 border-t border-slate-200 flex justify-between gap-6 items-end">
+                
+                {/* 左侧：免责声明 - 使用 Flex 限制最大宽度，彻底阻断文字右冲 */}
+                <div className="max-w-[70%]">
+                  <p className="text-[10px] text-slate-400 font-medium leading-relaxed uppercase">
+                    <strong>DISCLAIMER:</strong> THIS QUOTATION IS ESTIMATED AND SUBJECT TO FINAL CONFIRMATION BASED ON PHYSICAL COUNTER-SAMPLES. PRICES MAY FLUCTUATE DUE TO RAW MATERIAL COSTS AND CURRENCY EXCHANGE RATES.
+                  </p>
+                </div>
+
+                {/* 左侧：品牌护城河 Slogan - shrink-0 确保它不会被左侧文字挤压，自然靠右对齐 */}
+                <div className="text-right shrink-0 pb-1">
                   <p className="text-xs font-black text-slate-300 italic tracking-wide">
                     Powered by QuoteMaster AI Engine™
                   </p>
