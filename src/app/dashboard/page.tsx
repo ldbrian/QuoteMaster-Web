@@ -460,7 +460,20 @@ export default function Dashboard() {
         onSuccess={() => { setIsModalOpen(false); fetchLeads(); if(user) fetchUserProfile(user.id); }} 
         onSelectDemo={(demoData) => { setIsModalOpen(false); setSelectedInquiryId(demoData.id); setDetailData(demoData); }} 
       />
-      <QuoteDetailPanel isOpen={!!selectedInquiryId} onClose={() => { setSelectedInquiryId(null); setDetailData(null); }} quoteData={detailData} />
+      <QuoteDetailPanel 
+        isOpen={!!selectedInquiryId} 
+        onClose={() => { setSelectedInquiryId(null); setDetailData(null); }} 
+        quoteData={detailData} 
+        // 🌟 CTO 核心修复：使用正确的 leads 变量，并为 Demo 演示数据增加兜底兼容
+        inquiry={
+          leads.find(item => item.id === selectedInquiryId) || 
+          (detailData ? { 
+            product_name: detailData.title || detailData.product_name, 
+            thumbnail_url: detailData.image, 
+            status: 'completed' 
+          } : null)
+        } 
+      />
 
       {/* --- 商业化弹窗区 --- */}
       {showTaskModal && (
