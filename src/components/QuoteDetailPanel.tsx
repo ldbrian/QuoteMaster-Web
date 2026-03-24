@@ -1,28 +1,40 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, BotMessageSquare, Loader2, BarChart3, TrendingUp, Tag, 
   Target, Scale, DollarSign, FileText, Download, Calculator, 
-  Settings2, RefreshCw, Copy, CheckCheck
+  RefreshCw, Copy, CheckCheck, Edit3, Save
 } from 'lucide-react'; 
+import { supabase } from '@/src/utils/supabase/client'; 
 
 interface QuoteDetailPanelProps {
   isOpen: boolean;
   onClose: () => void;
   inquiry: any; 
   quoteData: any; 
-  onRetry?: () => void; // 🌟 新增：由父组件传入的重算方法
+  onRetry?: () => void;
 }
 
 export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, onRetry }: QuoteDetailPanelProps) {
   const [activeTab, setActiveTab] = useState<'plan_a' | 'plan_b' | 'plan_c'>('plan_b');
-  const [exchangeRate, setExchangeRate] = useState<number>(7.25); // 🌟 汇率状态
-  const [isCopied, setIsCopied] = useState(false); // 🌟 话术复制状态
+  const [exchangeRate, setExchangeRate] = useState<number>(7.25);
+  const [isCopied, setIsCopied] = useState(false);
   
+  // 🌟 CTO 核心改造：引入本地响应式可编辑状态
+  const [localQuote, setLocalQuote] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 当外部 quoteData 传入时，初始化本地可编辑数据
+  useEffect(() => {
+    if (quoteData) {
+      setLocalQuote(JSON.parse(JSON.stringify(quoteData))); // 深拷贝，断开引用
+    }
+  }, [quoteData]);
+
   if (!isOpen || !inquiry) return null;
 
-  const isAnalyzed = inquiry.status === 'completed' && quoteData;
+  const isAnalyzed = inquiry.status === 'completed' && localQuote;
 
   const tabs = [
     { id: 'plan_a', label: '方案 A (极致性价比)', icon: Target, color: 'emerald' },
@@ -30,17 +42,68 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
     { id: 'plan_c', label: '方案 C (高端品牌线)', icon: DollarSign, color: 'amber' }
   ] as const;
 
-  // 复制话术逻辑
   const handleCopyPitch = (text: string) => {
     navigator.clipboard.writeText(text);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  // 🌟 响应式数学引擎：处理 BOM 成本修改
+  const handleBomChange = (index: number, newCostStr: string) => {
+    if (!localQuote?.plans) return;
+    const updated = { ...localQuote };
+    const plan = updated.plans[activeTab];
+    
+    plan.bom[index].cost = parseFloat(newCostStr) || 0;
+    
+    // 实时重算总成本与利润率
+    const newTotalCost = plan.bom.reduce((sum: number, item: any) => sum + (Number(item.cost) || 0), 0);
+    if (plan.final_price > 0) {
+      plan.margin = (plan.final_price - newTotalCost) / plan.final_price;
+    }
+    setLocalQuote(updated);
+  };
+
+  // 🌟 响应式数学引擎：处理 FOB 最终报价修改
+  const handleFobChange = (newFobStr: string) => {
+    if (!localQuote?.plans) return;
+    const updated = { ...localQuote };
+    const plan = updated.plans[activeTab];
+    
+    const newFob = parseFloat(newFobStr) || 0;
+    plan.final_price = newFob;
+    
+    // 实时重算利润率
+    const totalCost = plan.bom.reduce((sum: number, item: any) => sum + (Number(item.cost) || 0), 0);
+    if (newFob > 0) {
+      plan.margin = (newFob - totalCost) / newFob;
+    } else {
+      plan.margin = 0;
+    }
+    setLocalQuote(updated);
+  };
+
+  // 🌟 持久化：保存修改到云端
+  const handleSaveChanges = async () => {
+    setIsSaving(true);
+    try {
+      // 假设 quote_data 存在 messages 表中最近的一条记录
+      const { data: msgs } = await supabase.from('messages').select('id').eq('inquiry_id', inquiry.id).order('created_at', { ascending: false }).limit(1);
+      if (msgs && msgs.length > 0) {
+        await supabase.from('messages').update({ quote_data: localQuote }).eq('id', msgs[0].id);
+      }
+      alert('✅ 报价微调已成功同步至云端！导出 PDF 将使用最新数据。');
+    } catch (error) {
+      alert('保存失败，请检查网络。');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className={`fixed inset-y-0 right-0 w-full md:w-[600px] lg:w-[800px] bg-slate-50 shadow-2xl z-[70] flex flex-col transition-transform duration-300 transform ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
       
-      {/* 顶部 Header - 中文为主 */}
+      {/* 顶部 Header */}
       <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-white shrink-0">
         <div className="flex items-center gap-2">
           <BotMessageSquare className="w-5 h-5 text-blue-600" />
@@ -49,10 +112,9 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
           </h2>
         </div>
         <div className="flex items-center gap-3">
-          {/* 🌟 核心：重算按钮 */}
           <button 
             onClick={() => {
-              if(window.confirm('确定要让 AI 重新核算此产品吗？')) {
+              if(window.confirm('确定要让 AI 重新全局核算此产品吗？您手动修改的数据将被覆盖。')) {
                 onRetry ? onRetry() : alert('请在外部组件绑定 onRetry 事件');
               }
             }}
@@ -87,7 +149,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
 
               <div className="flex-1 flex flex-col">
                 <h1 className="text-xl font-bold text-slate-800 line-clamp-1 mb-2">
-                  {quoteData?.product_name || inquiry?.product_name || '未知商品'}
+                  {localQuote?.product_name || inquiry?.product_name || '未知商品'}
                 </h1>
                 
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -101,18 +163,18 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
 
                 <div className="flex-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-xs text-slate-600 overflow-y-auto">
                   <strong className="text-slate-800">专家诊断：</strong> 
-                  {quoteData?.analysis_reasoning || '未生成诊断结论。'}
+                  {localQuote?.analysis_reasoning || '未生成诊断结论。'}
                 </div>
               </div>
             </div>
 
-            {/* 🛑 防御历史单阶数据 */}
-            {!quoteData?.plans ? (
+            {/* 防御历史单阶数据 */}
+            {!localQuote?.plans ? (
               <div className="flex flex-col items-center justify-center bg-white border border-slate-200 border-dashed rounded-2xl p-10 text-center">
                 <BarChart3 className="w-10 h-10 text-slate-300 mb-3" />
                 <h4 className="text-slate-700 font-bold mb-1">发现历史格式数据</h4>
                 <p className="text-sm text-slate-500 max-w-sm">
-                  这是一条早期生成的单阶报价记录，不支持三阶方案对比。请点击右上角“重新测算”升级到最新版 AI 引擎。
+                  这是一条早期生成的单阶报价记录，不支持编辑和三阶对比。请点击右上角“重新测算”升级引擎。
                 </p>
               </div>
             ) : (
@@ -143,36 +205,67 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                 {/* 当前方案内容区 */}
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex-1">
                   {(() => {
-                    const currentPlan = quoteData.plans[activeTab];
+                    const currentPlan = localQuote.plans[activeTab];
                     if (!currentPlan) return <div className="text-center text-slate-400 py-10">数据加载异常</div>;
 
                     const marginValue = currentPlan.margin || 0;
                     const finalPriceValue = currentPlan.final_price || 0;
                     const moqValue = currentPlan.moq || 500;
-                    // 🌟 核心：计算人民币价格
                     const cnyPriceValue = (finalPriceValue * exchangeRate).toFixed(2);
 
                     return (
                       <div className="space-y-6">
                         
-                        {/* 财务核心指标 */}
+                        {/* 财务核心指标 - 开放修改 */}
                         <div className="grid grid-cols-3 gap-4">
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 relative">
-                            <p className="text-xs font-bold text-slate-500 mb-1">FOB 离岸价 (USD)</p>
-                            <p className="text-2xl font-black text-emerald-600">${finalPriceValue.toFixed(2)}</p>
-                            <p className="text-[10px] text-slate-400 mt-1 font-mono absolute bottom-2 right-3">≈ ¥{cnyPriceValue}</p>
+                          {/* 🌟 修改点：FOB 输入框 */}
+                          <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 relative group transition-colors hover:border-emerald-300">
+                            <p className="text-xs font-bold text-emerald-800 mb-1 flex items-center justify-between">
+                              FOB 离岸价 (USD) <Edit3 className="w-3 h-3 opacity-50" />
+                            </p>
+                            <div className="flex items-center text-2xl font-black text-emerald-700">
+                              $<input 
+                                type="number"
+                                value={finalPriceValue}
+                                onChange={(e) => handleFobChange(e.target.value)}
+                                className="bg-transparent w-full outline-none focus:bg-white focus:ring-2 focus:ring-emerald-400 rounded px-1 transition-all"
+                              />
+                            </div>
+                            <p className="text-[10px] text-emerald-600/70 mt-1 font-mono absolute bottom-2 right-3">≈ ¥{cnyPriceValue}</p>
                           </div>
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                            <p className="text-xs font-bold text-slate-500 mb-1">建议起订量 (MOQ)</p>
-                            <p className="text-2xl font-black text-slate-800">{moqValue} <span className="text-sm font-medium text-slate-500">pcs</span></p>
+
+                          {/* MOQ 输入框 */}
+                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 group hover:border-slate-300 transition-colors">
+                            <p className="text-xs font-bold text-slate-500 mb-1 flex items-center justify-between">
+                              建议起订量 (MOQ) <Edit3 className="w-3 h-3 opacity-50" />
+                            </p>
+                            <div className="flex items-baseline gap-1 text-2xl font-black text-slate-800">
+                              <input 
+                                type="number"
+                                value={moqValue}
+                                onChange={(e) => {
+                                  const updated = {...localQuote};
+                                  updated.plans[activeTab].moq = Number(e.target.value);
+                                  setLocalQuote(updated);
+                                }}
+                                className="bg-transparent w-20 outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 transition-all"
+                              />
+                              <span className="text-sm font-medium text-slate-500">pcs</span>
+                            </div>
                           </div>
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                            <p className="text-xs font-bold text-slate-500 mb-1">预估利润率 (Margin)</p>
-                            <p className="text-2xl font-black text-blue-600">{(marginValue * 100).toFixed(1)}%</p>
+
+                          {/* 利润率 (受动量，仅展示) */}
+                          <div className={`p-4 rounded-xl border transition-colors ${marginValue < 0.15 ? 'bg-rose-50 border-rose-100' : 'bg-blue-50 border-blue-100'}`}>
+                            <p className={`text-xs font-bold mb-1 ${marginValue < 0.15 ? 'text-rose-600' : 'text-blue-600'}`}>
+                              动态利润率 (Margin)
+                            </p>
+                            <p className={`text-2xl font-black ${marginValue < 0.15 ? 'text-rose-600' : 'text-blue-700'}`}>
+                              {(marginValue * 100).toFixed(1)}%
+                            </p>
                           </div>
                         </div>
 
-                        {/* 🌟 汇率动态计算组件 */}
+                        {/* 汇率组件 */}
                         <div className="flex items-center justify-between p-3 bg-indigo-50/50 border border-indigo-100 rounded-lg">
                            <div className="flex items-center gap-2 text-indigo-800 text-sm font-medium">
                               <Calculator className="w-4 h-4 text-indigo-600" />
@@ -185,30 +278,53 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                                 className="w-16 text-center font-mono bg-white px-1 py-0.5 rounded border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-400"
                               />
                            </div>
-                           <span className="text-xs text-indigo-500">修改汇率实时测算人民币底价</span>
+                           <span className="text-xs text-indigo-500">实时测算人民币底价</span>
                         </div>
 
-                        {/* BOM 明细 */}
+                        {/* BOM 明细 - 开放修改 */}
                         <div>
-                          <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                            <BarChart3 className="w-4 h-4 text-slate-500" />
-                            BOM 成本明细 (Cost Breakdown)
+                          <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center justify-between">
+                            <span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-slate-500" /> BOM 成本明细 (USD)</span>
+                            <span className="text-xs text-slate-400 font-normal flex items-center gap-1"><Edit3 className="w-3 h-3" /> 点击单价即可修改</span>
                           </h3>
                           <div className="border border-slate-200 rounded-xl overflow-hidden">
                             <table className="w-full text-left text-sm">
                               <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
                                   <th className="px-4 py-2 font-bold text-slate-600">物料/工艺明细</th>
-                                  <th className="px-4 py-2 font-bold text-slate-600 text-right w-32">预估单价 (USD)</th>
+                                  <th className="px-4 py-2 font-bold text-slate-600 text-right w-32">预估单价</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
                                 {currentPlan.bom && Array.isArray(currentPlan.bom) ? currentPlan.bom.map((item: any, idx: number) => {
                                   const costValue = item.cost || 0;
                                   return (
-                                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                      <td className="px-4 py-3 text-slate-700 font-medium">{item.name || item.item}</td>
-                                      <td className="px-4 py-3 text-right text-emerald-700 font-mono font-bold">${costValue.toFixed(2)}</td>
+                                    <tr key={idx} className="hover:bg-slate-50 transition-colors group">
+                                      <td className="px-4 py-2 text-slate-700 font-medium">
+                                        {/* 允许修改品名 */}
+                                        <input 
+                                          type="text" 
+                                          value={item.name || item.item}
+                                          onChange={(e) => {
+                                            const updated = {...localQuote};
+                                            updated.plans[activeTab].bom[idx].name = e.target.value;
+                                            setLocalQuote(updated);
+                                          }}
+                                          className="bg-transparent w-full outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1"
+                                        />
+                                      </td>
+                                      <td className="px-4 py-2 text-right">
+                                        {/* 🌟 修改点：BOM 单价输入框 */}
+                                        <div className="flex items-center justify-end font-mono font-bold text-slate-700">
+                                          $
+                                          <input 
+                                            type="number"
+                                            value={costValue}
+                                            onChange={(e) => handleBomChange(idx, e.target.value)}
+                                            className="bg-transparent w-16 text-right outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 transition-all group-hover:bg-slate-100 border border-transparent group-hover:border-slate-200"
+                                          />
+                                        </div>
+                                      </td>
                                     </tr>
                                   );
                                 }) : (
@@ -219,7 +335,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                           </div>
                         </div>
 
-                        {/* 🌟 带有复制功能的谈判话术 */}
+                        {/* 对厂谈判话术 */}
                         <div className="bg-slate-900 p-5 rounded-xl text-slate-300 relative group">
                           <div className="flex items-center justify-between mb-3">
                             <p className="text-xs font-bold text-amber-400 uppercase tracking-widest flex items-center gap-2">
@@ -248,22 +364,28 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
         )}
       </div>
       
-      {/* 底部固定操作栏 */}
-      {isAnalyzed && quoteData?.plans && (
+      {/* 底部操作栏 */}
+      {isAnalyzed && localQuote?.plans && (
         <div className="border-t border-slate-200 bg-white p-4 shrink-0 flex items-center justify-between gap-4">
-          <div className="text-xs text-slate-500 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            已进行数据净化脱敏，可直接发往海外客户
-          </div>
+          
+          <button 
+            onClick={handleSaveChanges}
+            disabled={isSaving}
+            className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-200 transition-colors flex items-center gap-2"
+          >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            保存手动修改
+          </button>
+          
           <div className="flex items-center gap-3">
-            <button className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-200 transition-colors flex items-center gap-2">
-              <Download className="w-4 h-4" /> 导出内部 Excel
+            <button className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-lg text-sm hover:bg-emerald-100 transition-colors flex items-center gap-2">
+              <Download className="w-4 h-4" /> 导出 Excel
             </button>
             <button 
-              onClick={() => alert('请在外部或父组件对接 ExportPreviewModal 弹窗')}
-              className="px-5 py-2 bg-blue-600 text-white font-bold rounded-lg text-sm shadow-md hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2"
+              onClick={() => alert('提示：确保点击了“保存手动修改”后，再在父组件调用 ExportPreviewModal 弹窗以导出最新数据。')}
+              className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg text-sm shadow-md hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2"
             >
-              <FileText className="w-4 h-4" /> 生成客户 PDF
+              <FileText className="w-4 h-4" /> 预览客户 PDF
             </button>
           </div>
         </div>
