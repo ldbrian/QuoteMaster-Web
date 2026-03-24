@@ -89,66 +89,89 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData }
               </div>
             </div>
 
-            {/* A/B/C 三阶核价方案矩阵 - 保留原逻辑，微调间距和 Tailwind */}
+            {/* 🌟 核心修复：防御性编程与旧数据隔离 */}
             <div className="space-y-6">
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-slate-500" />
                 <h3 className="text-lg font-bold text-slate-700 uppercase tracking-wider">Proposal Matrix</h3>
               </div>
               
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                {planKeys.map(({ key, name, icon: Icon, bgColor }) => {
-                  const plan = quoteData.plans[key];
-                  if (!plan) return null;
-                  return (
-                    <div key={key} className={`border rounded-2xl p-6 ${bgColor} flex flex-col`}>
-                      <div className="flex items-center gap-3 mb-5 border-b pb-4 border-slate-200/50">
-                        <Icon className="w-6 h-6 text-slate-600" />
-                        <h4 className="font-extrabold text-lg text-slate-900">{plan.name || name}</h4>
-                      </div>
+              {/* 如果发现是旧版数据（没有 plans 字段），直接物理阻断，显示重算提示 */}
+              {!quoteData?.plans ? (
+                <div className="flex flex-col items-center justify-center bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-10 text-center">
+                  <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center mb-3">
+                    <BarChart3 className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <h4 className="text-slate-700 font-bold mb-1">历史格式数据</h4>
+                  <p className="text-sm text-slate-500 max-w-md">
+                    这是一条早期生成的单阶报价记录，无法使用最新的 A/B/C 三阶矩阵渲染。建议您关闭详情，在列表中点击“重新测算”进行升级。
+                  </p>
+                </div>
+              ) : (
+                /* 正常渲染新版三阶方案 */
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                  {planKeys.map(({ key, name, icon: Icon, bgColor }) => {
+                    const plan = quoteData.plans[key];
+                    if (!plan) return null;
+                    
+                    // 防御性提取数值，防止 AI 漏吐字段导致 .toFixed 崩溃
+                    const marginValue = plan.margin || 0;
+                    const finalPriceValue = plan.final_price || 0;
+                    const moqValue = plan.moq || 500;
 
-                      {/* 内部视角：利润率 */}
-                      <div className="mb-4">
-                        <span className="text-xs font-medium text-slate-500 uppercase tracking-widest">Internal Margin</span>
-                        <p className="text-3xl font-black text-slate-900">{(plan.margin * 100).toFixed(0)}%</p>
-                      </div>
-
-                      {/* 内部视角：出厂价 */}
-                      <div className="p-4 bg-white rounded-xl border border-slate-100 mb-6">
-                        <div className="flex justify-between items-baseline mb-2">
-                          <span className="text-sm font-medium text-slate-500">Estimated FOB Shanghai:</span>
-                          <span className="text-xl font-bold text-emerald-700">${plan.final_price.toFixed(2)}</span>
+                    return (
+                      <div key={key} className={`border rounded-2xl p-6 ${bgColor} flex flex-col`}>
+                        <div className="flex items-center gap-3 mb-5 border-b pb-4 border-slate-200/50">
+                          <Icon className="w-6 h-6 text-slate-600" />
+                          <h4 className="font-extrabold text-lg text-slate-900">{plan.name || name}</h4>
                         </div>
-                        <div className="flex justify-between items-baseline text-sm text-slate-600">
-                          <span>MOQ:</span>
-                          <span className="font-mono text-slate-800">{plan.moq} pcs</span>
+
+                        {/* 内部视角：利润率 */}
+                        <div className="mb-4">
+                          <span className="text-xs font-medium text-slate-500 uppercase tracking-widest">Internal Margin</span>
+                          <p className="text-3xl font-black text-slate-900">{(marginValue * 100).toFixed(0)}%</p>
+                        </div>
+
+                        {/* 内部视角：出厂价 */}
+                        <div className="p-4 bg-white rounded-xl border border-slate-100 mb-6">
+                          <div className="flex justify-between items-baseline mb-2">
+                            <span className="text-sm font-medium text-slate-500">Estimated FOB Shanghai:</span>
+                            <span className="text-xl font-bold text-emerald-700">${finalPriceValue.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline text-sm text-slate-600">
+                            <span>MOQ:</span>
+                            <span className="font-mono text-slate-800">{moqValue} pcs</span>
+                          </div>
+                        </div>
+
+                        {/* BOM 渲染 */}
+                        <div className="flex-1 space-y-4 mb-6">
+                          <h5 className="text-xs font-bold text-slate-600 uppercase tracking-widest">BOM Breakdown</h5>
+                          <div className="bg-white rounded-xl p-4 border border-slate-100 space-y-1.5 text-xs">
+                            {plan.bom && Array.isArray(plan.bom) ? plan.bom.map((item: any, index: number) => {
+                              const costValue = item.cost || 0;
+                              return (
+                                <div key={index} className="grid grid-cols-[1fr,auto] gap-2 py-1 text-slate-700 font-mono border-b border-slate-100 last:border-0">
+                                  <span className="truncate">{item.name || item.item}</span>
+                                  <span className="text-right text-emerald-700 font-bold">${costValue.toFixed(2)}</span>
+                                </div>
+                              );
+                            }) : (
+                              <div className="text-slate-400 text-center py-2">BOM 数据未吐出</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 对厂话术 */}
+                        <div className="bg-slate-900 rounded-xl p-4 text-sm text-slate-100">
+                          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-1.5">Factory Negotiation Pitch</span>
+                          <p className="whitespace-pre-wrap">{plan.factory_pitch || 'AI 暂未提供话术。'}</p>
                         </div>
                       </div>
-
-                      {/* 🌟 CTO 优化：BOM 渲染。重构为健壮的单价模式，去掉了 qty 依赖防止崩溃 */}
-                      <div className="flex-1 space-y-4 mb-6">
-                        <h5 className="text-xs font-bold text-slate-600 uppercase tracking-widest">BOM Breakdown (Internal Cost)</h5>
-                        <div className="bg-white rounded-xl p-4 border border-slate-100 space-y-1.5 text-xs">
-                          {plan.bom && Array.isArray(plan.bom) ? plan.bom.map((item: any, index: number) => (
-                            <div key={index} className="grid grid-cols-[1fr,auto] gap-2 py-1 text-slate-700 font-mono border-b border-slate-100 last:border-0">
-                              <span className="truncate">{item.name}</span>
-                              <span className="text-right text-emerald-700 font-bold">${item.cost.toFixed(2)}</span>
-                            </div>
-                          )) : (
-                            <div className="text-slate-400 text-center py-2">BOM 数据未吐出</div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 内部视角：对厂话术 */}
-                      <div className="bg-slate-900 rounded-xl p-4 text-sm text-slate-100">
-                        <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-1.5">Factory Negotiation Pitch</span>
-                        <p className="whitespace-pre-wrap">{plan.factory_pitch || 'AI 暂未提供话术，请根据核价结论自行判断。'}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </>
         )}
