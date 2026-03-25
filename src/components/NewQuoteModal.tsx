@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Upload, Loader2, Trash2, Sparkles, PlayCircle } from 'lucide-react'; 
+import { X, Upload, Loader2, Trash2, Sparkles, PlayCircle, ShieldCheck, Zap, Crown } from 'lucide-react'; 
 import { supabase } from '@/src/utils/supabase/client'; 
 import imageCompression from 'browser-image-compression';
 
@@ -89,6 +89,9 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
   const [note, setNote] = useState('');
   const [uploading, setUploading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  
+  // 🌟 新增：拦截收费站状态
+  const [showTollbooth, setShowTollbooth] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -99,6 +102,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
     };
     if (isOpen) {
       fetchUser();
+      setShowTollbooth(false); // 每次打开重置拦截器
     }
   }, [isOpen]);
 
@@ -117,10 +121,17 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
     setFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
-  const handleSubmit = async () => {
+  // 🌟 拦截器：点击触发按钮时先拦截
+  const handleTriggerAI = () => {
     if (files.length === 0) return alert('请至少上传一张产品图片');
     if (!userId) return alert('用户身份异常，请刷新页面重试');
-    
+    // 弹出收费确认页面
+    setShowTollbooth(true);
+  };
+
+  // 🌟 真正执行上传和扣费的逻辑
+  const executeSubmit = async () => {
+    setShowTollbooth(false);
     setUploading(true);
 
     try {
@@ -136,13 +147,12 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
       });
       const imageUrls = await Promise.all(uploadPromises);
 
-      // 🔴 修复点：严格遵守状态机契约，写入 'pending'
       const { data: newInquiry, error: dbError } = await supabase
         .from('inquiries')
         .insert({
           product_name: 'AI 深度解析中...', 
           source: '工作台上传',
-          status: 'pending',    // <--- 修复 23514 错误的核心
+          status: 'pending',    
           thumbnail_url: imageUrls[0], 
           image_urls: imageUrls,
           user_prompt: note
@@ -152,7 +162,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
 
       if (dbError) throw dbError;
 
-      // 扣费执行
+      // 执行底层扣费 (调用 DB RPC)
       const { error: rpcError } = await supabase.rpc('increment_usage_count', { user_id: userId });
       if (rpcError) console.error("扣费执行失败:", rpcError);
 
@@ -170,22 +180,22 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative animate-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0 relative z-10">
           <h3 className="font-bold text-slate-800">新建 AI 多套核价方案</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X size={20} />
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-1.5 rounded-full transition-colors">
+            <X size={18} />
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-6 overflow-y-auto space-y-5">
+        <div className="p-6 overflow-y-auto space-y-6 relative z-10">
           
           {/* 上传区 */}
-          <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-50 hover:border-blue-400 transition-all min-h-[140px]">
+          <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-50 hover:border-blue-400 hover:bg-blue-50/50 transition-all min-h-[140px]">
             {files.length > 0 ? (
               <div className="w-full">
                 <div className="grid grid-cols-4 gap-3 mb-4">
@@ -201,20 +211,21 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
                     </div>
                   ))}
                   {files.length < MAX_IMAGES && (
-                    <label className="aspect-square rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 text-slate-400 transition-colors">
+                    <label className="aspect-square rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 text-slate-400 transition-colors bg-white">
                       <Upload size={20} />
                       <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
                     </label>
                   )}
                 </div>
-                <p className="text-xs text-center text-slate-500">已选择 {files.length}/{MAX_IMAGES} 张</p>
+                <p className="text-xs text-center text-slate-500 font-medium">已选择 {files.length}/{MAX_IMAGES} 张图片</p>
               </div>
             ) : (
-              <label className="flex flex-col items-center cursor-pointer w-full py-4">
-                <div className="w-10 h-10 bg-white shadow-sm rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <Upload size={20} className="text-blue-500" />
+              <label className="flex flex-col items-center cursor-pointer w-full py-5">
+                <div className="w-12 h-12 bg-white shadow-sm border border-slate-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                  <Upload size={22} className="text-blue-600" />
                 </div>
-                <p className="text-sm font-medium text-slate-600">点击上传产品细节图</p>
+                <p className="text-sm font-bold text-slate-700 mb-1">点击上传产品细节图</p>
+                <p className="text-xs text-slate-400">支持正面、侧面及材质特写（最多4张）</p>
                 <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
               </label>
             )}
@@ -222,28 +233,37 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
 
           {/* 需求框 */}
           <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">客户要求 / 改动点</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">客户要求 / 调整策略 (选填)</label>
             <textarea 
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="例如：预算有限，出个低配版方案；或者：要求按最高标准打样..."
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none min-h-[80px] resize-none"
+              placeholder="例如：预算卡得很死，尽量压低 BOM 成本；或者：要求按欧洲顶级环保标准打样..."
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none min-h-[80px] resize-none bg-slate-50 focus:bg-white transition-colors"
             />
           </div>
 
+          {/* 🌟 绿色盾牌：安全承诺预埋 */}
+          <div className="p-3.5 bg-emerald-50/80 border border-emerald-100 rounded-xl flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-emerald-900 mb-0.5">企业级隐私安全保障</p>
+              <p className="text-[11px] text-emerald-700 leading-relaxed">您的图片与商业机密全程加密传输，仅用于本次核价演算，绝不用于公有模型训练或对第三方泄露。</p>
+            </div>
+          </div>
+
           <button 
-            onClick={handleSubmit}
+            onClick={handleTriggerAI}
             disabled={uploading || files.length === 0}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-sm"
           >
-            {uploading ? <Loader2 className="animate-spin" size={20} /> : '触发 AI 引擎'}
+            {uploading ? <Loader2 className="animate-spin" size={18} /> : '启动 AI 极速核价'}
           </button>
 
           {/* 演示数据区 */}
-          <div className="pt-4 mt-2 border-t border-slate-100">
+          <div className="pt-5 mt-2 border-t border-slate-100">
             <div className="flex items-center gap-1.5 mb-3">
               <Sparkles className="w-4 h-4 text-amber-500" />
-              <p className="text-sm font-bold text-slate-700">演示数据 (已适配三阶方案)</p>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">试试内置真实爆款 (免扣算力)</p>
             </div>
             
             <div className="flex overflow-x-auto gap-3 pb-2 snap-x" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -264,7 +284,7 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
                     </div>
                     <img src={demo.image} alt={demo.title} className="w-full h-full object-cover" />
                   </div>
-                  <div className="p-2 text-center">
+                  <div className="p-2 text-center bg-white">
                     <p className="text-xs font-bold text-slate-800 truncate">{demo.title}</p>
                   </div>
                 </div>
@@ -273,6 +293,43 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
           </div>
           
         </div>
+
+        {/* 🌟 收费站拦截遮罩 (Tollbooth) */}
+        {showTollbooth && (
+          <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-5 shadow-sm border-4 border-white">
+              <Zap className="w-8 h-8 text-blue-600" />
+            </div>
+            
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-3">启动 AI 商业引擎</h3>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed px-2">
+              系统将通过大模型深度提取多图特征、精准拆解底层 BOM 成本，并为您智能生成高低搭配的多阶报价矩阵。
+            </p>
+            
+            <div className="bg-slate-50 px-5 py-4 rounded-xl border border-slate-200 mb-8 w-full flex justify-between items-center shadow-inner">
+              <span className="text-sm font-bold text-slate-600">本次操作消耗算力</span>
+              <span className="font-black text-blue-600 flex items-center gap-1 text-lg">
+                <Crown className="w-5 h-5" /> 1 次
+              </span>
+            </div>
+            
+            <div className="flex flex-col gap-3 w-full">
+              <button 
+                onClick={executeSubmit} 
+                className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-600/30 transition-all flex justify-center items-center gap-2 text-base"
+              >
+                确认扣除并解析
+              </button>
+              <button 
+                onClick={() => setShowTollbooth(false)} 
+                className="w-full py-3.5 bg-transparent text-slate-500 font-bold rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                先不测了
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

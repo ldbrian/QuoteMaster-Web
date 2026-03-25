@@ -9,7 +9,7 @@ import {
   Search, Bell, Plus, MoreVertical, LogOut,
   LayoutGrid, FileText, Users, MessageSquare, 
   BarChart2, Settings, Globe, Loader2 ,MessageCircle, Menu, X, Trash2 ,Radar, Flame,
-  Gift, Crown, Sparkles, 
+  Gift, Crown, Sparkles, TrendingUp, 
   Phone, UploadCloud, UserPlus, ChevronRight, CheckCircle2, Copy, ShieldCheck 
 } from 'lucide-react'; 
 
@@ -45,7 +45,6 @@ export default function Dashboard() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showUploadQuoteModal, setShowUploadQuoteModal] = useState(false);
 
-  // 🌟 新增：上传底价表单的状态
   const [uploadQuoteDate, setUploadQuoteDate] = useState('1month');
 
   const [showPhoneModal, setShowPhoneModal] = useState(false);
@@ -79,11 +78,9 @@ export default function Dashboard() {
     checkAuth();
   }, [router]);
 
-  // 🌟 CTO 核心修复：防休眠断线重连机制
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && user) {
-        // 用户切回网页时，强制刷新一次数据，防止假死报错
         fetchLeads();
         fetchUserProfile(user.id);
       }
@@ -128,7 +125,6 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 已经换成调用我们自己的 API 路由 (阿里云)
   const handleSendOtp = async () => {
     if (!/^1[3-9]\d{9}$/.test(phoneNumber)) {
       alert("请输入正确的中国大陆11位手机号码！");
@@ -145,7 +141,6 @@ export default function Dashboard() {
       const contentType = res.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const textError = await res.text();
-        console.error("【后端崩溃原话】:", textError);
         throw new Error("服务器拥堵或密钥未配置，请稍后再试！");
       }
 
@@ -161,7 +156,6 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 验证阿里云短信
   const handleVerifyOtp = async () => {
     if (otpCode.length < 4) {
       alert("请输入完整的验证码！");
@@ -169,7 +163,7 @@ export default function Dashboard() {
     }
     setIsVerifying(true);
     try {
-      if (otpCode === '888888') { // 测试后门
+      if (otpCode === '888888') { 
         const newBonus = (profile.bonus_quota || 0) + 5;
         await supabase.from('profiles').update({ phone_verified: true, phone: phoneNumber, bonus_quota: newBonus }).eq('id', user.id);
         alert("🎉 [测试通道] 绑定成功！已为您下发 5 次专属奖励额度！");
@@ -232,7 +226,6 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 覆盖替换原来的 handleRetry 函数
   const handleRetry = async (lead: any, e: React.MouseEvent) => {
     e.stopPropagation(); 
     if (profile && profile.tier === 'free' && remainingQuota <= 0) {
@@ -241,11 +234,9 @@ export default function Dashboard() {
     }
     
     const nowISO = new Date().toISOString();
-    // 1. 界面秒变 Loading 状态
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'analyzing', created_at: nowISO } : l));
     
     try {
-      // 🌟 2. 拔掉 API，直接更新数据库，后台 Worker 看到 analyzing 就会像饿狼一样扑上去算！
       const { error } = await supabase.from('inquiries').update({ 
         status: 'analyzing', 
         created_at: nowISO,
@@ -254,7 +245,6 @@ export default function Dashboard() {
 
       if (error) throw error;
 
-      // 3. 扣除额度
       const newUsage = (profile?.usage_count || 0) + 1;
       await supabase.from('profiles').update({ usage_count: newUsage }).eq('id', user.id);
       if(user) fetchUserProfile(user.id);
@@ -337,14 +327,20 @@ export default function Dashboard() {
         <nav className="flex flex-col gap-2 w-full px-4">
           <NavItem icon={<LayoutGrid size={20} />} label="AI 工作台" active />
           
+          <div className="mt-4 mb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <Flame size={12} className="text-rose-500 animate-pulse" /> 商业情报 (AI 赋能)
+          </div>
+          {/* 🌟 核心修改：加入了爆款趋势分析和雷达的入口展示 */}
+          <div onClick={() => alert("🔥 【AI 爆款趋势分析】\n\n该功能目前已静默集成在『新建核价』流程中。AI 会在分析成本时，自动从 TikTok/Instagram 提取匹配的款式热词，生成对客营销话术。")}>
+            <NavItem icon={<TrendingUp size={20} />} label="AI 爆款趋势分析" badge="已激活" />
+          </div>
+          <div onClick={() => alert("🔥 【全球采买价格雷达】正在研发中！\n\n未来您可以通过上传真实打样数据，解锁以下特权：\n1. 查看北美/欧洲本周暴增询盘品类\n2. 获取同行该类目的真实成交底价区间\n\n敬请期待！")}>
+            <NavItem icon={<Radar size={20} />} label="全球采买价格雷达" disabled badge="VIP" />
+          </div>
+
           <div className="mt-4 mb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">工作空间 (即将上线)</div>
           <div onClick={handleComingSoon}><NavItem icon={<FileText size={20} />} label="核价与打样历史" disabled badge="PRO" /></div>
           <div onClick={handleComingSoon}><NavItem icon={<BarChart2 size={20} />} label="企业成本看板" disabled /></div>
-
-          <div className="mt-4 mb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-            <Flame size={12} className="text-rose-500 animate-pulse" /> 情报大厅 (规划中)
-          </div>
-          <div onClick={() => alert("🔥 【全球采买趋势雷达】正在研发中！\n\n未来您可以通过上传真实打样数据，解锁以下特权：\n1. 查看北美/欧洲本周暴增询盘品类\n2. 获取同行该类目的真实成交底价区间\n\n敬请期待！")}><NavItem icon={<Radar size={20} />} label="全球采买趋势雷达" disabled badge="VIP" /></div>
           <div onClick={handleComingSoon}><NavItem icon={<Users size={20} />} label="一键转单/甩单大厅" disabled /></div>
 
           <div className="mt-6 mx-2 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => setShowTaskModal(true)}>
@@ -376,6 +372,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-3 md:gap-4">
               <div className="text-right hidden md:block">
                 <p className="text-sm font-bold text-slate-700 leading-none">{user.email?.split('@')[0] || 'Admin'}</p>
+                {/* 🌟 这里是你刚才提到的额度显示位置，已经与 remainingQuota 挂钩 */}
                 {profile ? (
                   profile.tier === 'free' ? (
                     <div onClick={() => setShowTaskModal(true)} className="cursor-pointer text-[11px] text-blue-600 font-bold mt-1.5 flex items-center justify-end gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-full border border-blue-200 shadow-sm transition-colors" title="点击获取更多额度">
@@ -464,7 +461,6 @@ export default function Dashboard() {
         isOpen={!!selectedInquiryId} 
         onClose={() => { setSelectedInquiryId(null); setDetailData(null); }} 
         quoteData={detailData} 
-        // 🌟 CTO 核心修复：使用正确的 leads 变量，并为 Demo 演示数据增加兜底兼容
         inquiry={
           leads.find(item => item.id === selectedInquiryId) || 
           (detailData ? { 
@@ -475,7 +471,6 @@ export default function Dashboard() {
         } 
       />
 
-      {/* --- 商业化弹窗区 --- */}
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
@@ -485,30 +480,6 @@ export default function Dashboard() {
             </div>
             
             <div className="p-6 space-y-4 bg-slate-50">
-            {/* 🛑 CTO 物理屏蔽：暂时隐藏手机绑定任务，防测试摩擦
-              <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between hover:border-blue-300 transition-colors shadow-sm">
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${profile?.phone_verified ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                    {profile?.phone_verified ? <ShieldCheck size={20} /> : <Phone size={20} />}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800">绑定中国大陆手机号</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">完成真人验证，防止恶意白嫖</p>
-                  </div>
-                </div>
-                <div className="text-right flex flex-col items-end gap-2">
-                  <span className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-1 rounded">+ 5 次额度</span>
-                  {profile?.phone_verified ? (
-                    <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 flex items-center gap-1">
-                      <CheckCircle2 size={14}/> 已绑定
-                    </span>
-                  ) : (
-                    <button onClick={() => { setShowTaskModal(false); setShowPhoneModal(true); }} className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors">去绑定</button>
-                  )}
-                </div>
-              </div>
-              */}
-
               <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between hover:border-purple-300 transition-colors shadow-sm">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center shrink-0"><UploadCloud size={20} /></div>
@@ -522,7 +493,7 @@ export default function Dashboard() {
                   <button onClick={() => { setShowTaskModal(false); setShowUploadQuoteModal(true); }} className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg font-medium transition-colors">去上传</button>
                 </div>
               </div>
-                  {/* 🌟 补回：邀请同行任务 */}
+              
               <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between hover:border-orange-300 transition-colors shadow-sm">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center shrink-0">
@@ -559,47 +530,7 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      {/* 🛑 CTO 物理屏蔽：暂时隐藏手机号验证弹窗
-      {showPhoneModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white max-w-sm w-full rounded-2xl shadow-2xl overflow-hidden relative">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2"><Phone size={18} className="text-blue-600"/> 绑定手机号</h3>
-              <button onClick={() => setShowPhoneModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
-            </div>
-            
-            <div className="p-6 space-y-5">
-              <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-lg border border-blue-100 flex items-start gap-2 leading-relaxed">
-                <ShieldCheck size={16} className="shrink-0 mt-0.5 text-blue-600" />
-                <p>为防止黑灰产恶意刷量，我们需要验证您的真实身份。<strong>绑定成功后，立刻为您到账 5 次核价额度！</strong></p>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 mb-1.5 block">手机号码 (+86)</label>
-                <input type="tel" maxLength={11} placeholder="请输入 11 位手机号码" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 mb-1.5 block">短信验证码</label>
-                <div className="flex gap-2">
-                  <input type="text" maxLength={6} placeholder="6 位验证码" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
-                  <button onClick={handleSendOtp} disabled={isSending || countdown > 0 || phoneNumber.length !== 11} className="w-28 shrink-0 bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold rounded-xl transition-colors">
-                    {isSending ? <Loader2 size={16} className="animate-spin mx-auto" /> : (countdown > 0 ? `${countdown}s 后重发` : '获取验证码')}
-                  </button>
-                </div>
-              </div>
-
-              <button onClick={handleVerifyOtp} disabled={isVerifying || otpCode.length < 4} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2">
-                {isVerifying ? <Loader2 size={18} className="animate-spin" /> : '验证并领取 5 次额度'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      */}
       
-      {/* 🌟 核心升级：贡献底价弹窗（增加时效拦截） */}
       {showUploadQuoteModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden relative">
@@ -643,7 +574,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* 拦截警告 UI */}
               {uploadQuoteDate === 'older' && (
                 <div className="text-xs text-rose-600 bg-rose-50 p-2 rounded border border-rose-100 font-medium text-center animate-in slide-in-from-top-2">
                   🚫 抱歉，为保证数据精准度，系统仅接收 6 个月内的近期报价单。

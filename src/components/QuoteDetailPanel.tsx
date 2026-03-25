@@ -100,13 +100,20 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
     }
   };
 
+  // 🌟 反转逻辑 1：指令重算改为触发 Tollbooth 收费站
   const executeRetry = () => {
     if (!retryNote.trim()) return alert('请输入修改要求');
+    setShowRetryModal(false); // 关闭输入框
+    setShowTollbooth(true);   // 唤起收费拦截站
+  };
+
+  // 🌟 反转逻辑 2：确认扣除后真正发送给外部 onRetry
+  const confirmRetry = () => {
     if (onRetry) {
       onRetry(retryNote);
-      setShowRetryModal(false);
-      setRetryNote('');
     }
+    setShowTollbooth(false);
+    setRetryNote('');
   };
 
   const getExportData = () => {
@@ -122,14 +129,12 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
     };
   };
 
-  // 🌟 核心突破：返回一个 Fragment (<>)，把 PDF 弹窗彻底移出 main_modal 的包裹！
   return (
     <>
-      {/* 🚀 主工作台：从“侧边抽屉”升级为“居中 80vw 巨型弹窗” */}
+      {/* 主工作台：居中巨型弹窗 */}
       <div className={`fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm transition-opacity duration-300 p-4 lg:p-8`}>
         <div className={`bg-white w-full max-w-[90vw] xl:max-w-[85vw] h-[95vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200`}>
           
-          {/* --- 顶部全局 Header --- */}
           <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm">
@@ -162,7 +167,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
               </div>
             ) : (
               <>
-                {/* 🚀 左侧栏：商业情报与视觉锚点 (固定宽度) */}
                 <div className="w-full lg:w-[320px] xl:w-[380px] bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto p-6">
                   <div className="aspect-square w-full rounded-xl overflow-hidden border border-slate-200 bg-white mb-5 shadow-sm">
                     {inquiry?.thumbnail_url ? (
@@ -195,10 +199,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                   </div>
                 </div>
 
-                {/* 🚀 右侧栏：宽屏矩阵操作区 (占据剩余全部空间) */}
                 <div className="flex-1 bg-white flex flex-col min-w-0">
-                  
-                  {/* 右侧内部主滚动区 */}
                   <div className="flex-1 overflow-y-auto p-6 xl:p-8">
                     {!localQuote?.plans || availablePlans.length === 0 ? (
                       <div className="flex flex-col items-center justify-center bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-10 text-center h-full">
@@ -210,8 +211,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                       </div>
                     ) : (
                       <div className="max-w-5xl mx-auto space-y-8">
-                        
-                        {/* 优雅的方案 Tabs */}
                         {availablePlans.length > 1 && (
                           <div className="flex p-1.5 bg-slate-100 rounded-xl max-w-2xl">
                             {availablePlans.map((key) => (
@@ -240,8 +239,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
 
                           return (
                             <div className="space-y-8 animate-in fade-in duration-300">
-                              
-                              {/* 1. 大盘财务数据 (横向铺开) */}
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 relative group transition-colors hover:border-emerald-300 shadow-sm">
                                   <p className="text-sm font-bold text-emerald-800 mb-2 flex items-center justify-between">
@@ -277,7 +274,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                                 </div>
                               </div>
 
-                              {/* 汇率条 */}
                               <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
                                 <div className="flex items-center gap-3 text-slate-600 text-sm font-medium">
                                   <Calculator className="w-5 h-5 text-slate-400" />
@@ -286,7 +282,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                                 </div>
                               </div>
 
-                              {/* 2. 宽屏双轨话术 (并排展示，极具压迫感) */}
                               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                                 <div className="bg-blue-50/40 p-6 rounded-2xl border border-blue-100 flex flex-col shadow-sm">
                                   <div className="flex items-center justify-between mb-4 border-b border-blue-200/50 pb-3">
@@ -313,7 +308,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                                 </div>
                               </div>
 
-                              {/* 3. 宽屏 BOM 成本表 */}
                               <div>
                                 <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center justify-between">
                                   <span className="flex items-center gap-2"><BarChart3 className="w-5 h-5 text-slate-500" /> 底层 BOM 结构 (USD)</span>
@@ -358,26 +352,23 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                     )}
                   </div>
 
-                  {/* 右侧底部 Footer：固定在下方的全局操作栏 */}
-                  {isAnalyzed && localQuote?.plans && (
-                    <div className="border-t border-slate-200 bg-white p-5 shrink-0 flex items-center justify-between gap-4 shadow-[0_-10px_40px_rgba(0,0,0,0.03)]">
-                      <button onClick={handleSaveChanges} disabled={isSaving} className="px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl text-sm hover:bg-slate-200 transition-colors flex items-center gap-2">
-                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 保存工作区
+                  <div className="border-t border-slate-200 bg-white p-5 shrink-0 flex items-center justify-between gap-4 shadow-[0_-10px_40px_rgba(0,0,0,0.03)]">
+                    <button onClick={handleSaveChanges} disabled={isSaving} className="px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl text-sm hover:bg-slate-200 transition-colors flex items-center gap-2">
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 保存工作区
+                    </button>
+                    <div className="flex items-center gap-4">
+                      <button className="px-5 py-3 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-xl text-sm hover:bg-emerald-100 transition-colors flex items-center gap-2">
+                        <Download className="w-4 h-4" /> 导出内控 Excel
                       </button>
-                      <div className="flex items-center gap-4">
-                        <button className="px-5 py-3 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-xl text-sm hover:bg-emerald-100 transition-colors flex items-center gap-2">
-                          <Download className="w-4 h-4" /> 导出内控 Excel
-                        </button>
-                        {/* 🚀 触发 Tollbooth 收费站弹窗 */}
-                        <button 
-                          onClick={() => setShowTollbooth(true)} 
-                          className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-blue-600/30 hover:bg-blue-700 hover:-translate-y-0.5 transition-all flex items-center gap-2"
-                        >
-                          <FileText className="w-5 h-5" /> 渲染客户 PDF
-                        </button>
-                      </div>
+                      {/* 🌟 反转逻辑 3：生成 PDF 不再拦截，直接放行触发 Modal */}
+                      <button 
+                        onClick={() => setShowExportModal(true)} 
+                        className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-blue-600/30 hover:bg-blue-700 hover:-translate-y-0.5 transition-all flex items-center gap-2"
+                      >
+                        <FileText className="w-5 h-5" /> 渲染客户 PDF
+                      </button>
                     </div>
-                  )}
+                  </div>
 
                 </div>
               </>
@@ -386,7 +377,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
         </div>
       </div>
 
-      {/* --- 沉浸式重算弹窗 --- */}
+      {/* --- 沉浸式指令输入弹窗 --- */}
       {showRetryModal && (
         <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95">
@@ -409,14 +400,14 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                 />
               </div>
               <button onClick={executeRetry} className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex justify-center items-center gap-2 transition-colors shadow-md">
-                <Send className="w-4 h-4" /> 确认发送指令
+                <Send className="w-4 h-4" /> 下一步：确认指令
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 🚀 预埋收费站：Tollbooth 拦截弹窗 */}
+      {/* 🌟 反转逻辑 4：将 Tollbooth 用于“重算”拦截 */}
       {showTollbooth && (
         <div className="fixed inset-0 z-[90] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95">
@@ -425,34 +416,34 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                 <X className="w-5 h-5" />
               </button>
               
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto border-4 border-white shadow-sm">
-                <FileText className="w-10 h-10 text-blue-600" />
+              <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto border-4 border-white shadow-sm">
+                <RefreshCw className="w-10 h-10 text-indigo-600" />
               </div>
               
               <div>
-                <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2">生成无痕脱敏 PDF</h3>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2">启动 AI 重新演算</h3>
                 <p className="text-sm text-slate-500 leading-relaxed px-4">
-                  即将启动数据防火墙，隐藏所有底层 BOM 成本与利润率，为您生成带有专业防伪水印的高清出海报价单。
+                  系统将根据您的最新指令：“<span className="text-slate-700 font-medium line-clamp-2">{retryNote}</span>”，重新调动大模型进行核价与方案重构。
                 </p>
               </div>
 
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center text-sm shadow-inner">
                 <span className="text-slate-600 font-bold">本次消耗算力：</span>
-                <span className="font-black text-blue-600 flex items-center gap-1.5"><Crown className="w-4 h-4" /> 1 次</span>
+                <span className="font-black text-indigo-600 flex items-center gap-1.5"><Crown className="w-4 h-4" /> 1 次</span>
               </div>
 
               <div className="pt-2 space-y-3">
                 <button 
-                  onClick={() => { 
-                    setShowTollbooth(false); 
-                    setShowExportModal(true); 
-                  }}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all text-base"
+                  onClick={confirmRetry}
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition-all text-base"
                 >
-                  确认扣除并生成
+                  确认扣除并重算
                 </button>
-                <button className="w-full py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-xl transition-all border border-slate-200">
-                  了解 Pro 无限版特权
+                <button 
+                  onClick={() => setShowTollbooth(false)}
+                  className="w-full py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-xl transition-all border border-slate-200"
+                >
+                  取消
                 </button>
               </div>
             </div>
@@ -460,7 +451,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
         </div>
       )}
 
-      {/* 🌟 PDF 导出器：它现在以独立 Fragment 存在，彻底挣脱了 CSS 限制！ */}
       {showExportModal && (
         <ExportPreviewModal 
           isOpen={showExportModal} 
