@@ -6,7 +6,7 @@ import { X, FileText, FileSpreadsheet, Printer, ShieldCheck } from 'lucide-react
 interface ExportPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  quoteData: any; // 现在接收的是包含 plans: { plan_a, plan_b, plan_c } 的新结构
+  quoteData: any; 
 }
 
 export default function ExportPreviewModal({ isOpen, onClose, quoteData }: ExportPreviewModalProps) {
@@ -58,7 +58,6 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
     }
   };
 
-  // 🌟 Excel 导出也严格执行数据防火墙，只导出清洗后的数据
   const handleExportExcel = async () => {
     try {
       const XLSX = await import('xlsx');
@@ -74,8 +73,6 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
       });
 
       const worksheet = XLSX.utils.json_to_sheet(excelData);
-      
-      // 调整列宽
       worksheet['!cols'] = [{ wch: 30 }, { wch: 60 }, { wch: 15 }, { wch: 25 }];
 
       const workbook = XLSX.utils.book_new();
@@ -88,7 +85,8 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 md:p-8 transition-opacity">
+    // 🌟 Z-index 提升为 100，坚如磐石的最顶层
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 md:p-8 transition-opacity">
       <div className="bg-white w-full max-w-6xl h-full max-h-[90vh] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* 左侧：装配控制台 */}
@@ -104,7 +102,6 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
-            {/* 防火墙提示 */}
             <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl flex items-start gap-3">
               <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
               <div>
@@ -188,13 +185,11 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
           <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center">
             <div className="shadow-2xl h-fit">
             
-            {/* A4 纸张容器 */}
             <div 
               ref={previewRef}
               className="bg-white shadow-xl w-full max-w-[210mm] min-h-[297mm] p-8 md:p-12 text-slate-800 font-sans flex flex-col relative"
               style={{ aspectRatio: '210/297' }}
             >
-              {/* 纸张头部 */}
               <div className="flex justify-between items-start border-b-2 border-slate-800 pb-6 mb-6">
                 <div>
                   <h1 className="text-3xl font-black text-slate-900 tracking-tight">OFFICIAL QUOTATION</h1>
@@ -206,7 +201,6 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
                 </div>
               </div>
 
-              {/* 客户与产品信息 */}
               <div className="grid grid-cols-2 gap-8 mb-8">
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Quoted To</p>
@@ -222,7 +216,6 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
                 </div>
               </div>
 
-              {/* A/B/C 三阶报价矩阵 */}
               <div className="flex-1 mb-8">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Proposed Sourcing Options</p>
                 <div className="flex flex-col gap-5">
@@ -235,7 +228,7 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
                           <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
                           <div className="text-right">
                             <span className="text-sm text-slate-500 mr-2">Est. FOB:</span>
-                            <span className="text-xl font-bold text-blue-700 font-mono">{plan.fob_price_range}</span>
+                            <span className="text-xl font-bold text-blue-700 font-mono">{plan.fob_price_range || `$${plan.final_price?.toFixed(2)}`}</span>
                           </div>
                         </div>
                         <p className="text-sm text-slate-600 mb-3 leading-relaxed">
@@ -250,7 +243,6 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
                 </div>
               </div>
 
-              {/* 额外备注 */}
               {remarks && (
                 <div className="mb-6">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Remarks</p>
@@ -258,18 +250,12 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
                 </div>
               )}
 
-              {/* ⚠️ 终极免责声明 & 水印 - 物理布局修复重叠版 */}
-              {/* 🔴 移除 relative，使用 flex 布局强行分离左右文字 */}
               <div className="mt-auto pt-6 border-t border-slate-200 flex justify-between gap-6 items-end">
-                
-                {/* 左侧：免责声明 - 使用 Flex 限制最大宽度，彻底阻断文字右冲 */}
                 <div className="max-w-[70%]">
                   <p className="text-[10px] text-slate-400 font-medium leading-relaxed uppercase">
                     <strong>DISCLAIMER:</strong> THIS QUOTATION IS ESTIMATED AND SUBJECT TO FINAL CONFIRMATION BASED ON PHYSICAL COUNTER-SAMPLES. PRICES MAY FLUCTUATE DUE TO RAW MATERIAL COSTS AND CURRENCY EXCHANGE RATES.
                   </p>
                 </div>
-
-                {/* 左侧：品牌护城河 Slogan - shrink-0 确保它不会被左侧文字挤压，自然靠右对齐 */}
                 <div className="text-right shrink-0 pb-1">
                   <p className="text-xs font-black text-slate-300 italic tracking-wide">
                     Powered by QuoteMaster AI Engine™
