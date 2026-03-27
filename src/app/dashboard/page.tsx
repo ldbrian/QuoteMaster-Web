@@ -107,7 +107,7 @@ export default function Dashboard() {
       }
     }
   }, [leads, selectedInquiryId, detailData]);
-  
+
   const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
@@ -261,9 +261,8 @@ export default function Dashboard() {
       if(user) fetchUserProfile(user.id);
 
     } catch (error) {
-      alert("网络异常，无法召唤 AI，请重试！");
-      setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'failed' } : l));
-      await supabase.from('inquiries').update({ status: 'failed' }).eq('id', lead.id);
+      console.error("🔥抓到真凶了，数据库拒绝原因：", error);
+      alert("错误已打印在控制台，请按 F12 查看！");
     }
   };
 
