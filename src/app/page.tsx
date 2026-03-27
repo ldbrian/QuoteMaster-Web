@@ -113,7 +113,7 @@ export default function LandingPage() {
             <span className="w-2 h-2 rounded-full bg-blue-500"></span>
             QuoteMaster AI Engine™ - 您的全能外贸谈判助理
           </p>
-          <p className="text-sm text-slate-400">© {new Date().getFullYear()} ToughLove Online. All rights reserved.</p>
+          <p className="text-sm text-slate-400">© {new Date().getFullYear()} QM-AI. All rights reserved.</p>
         </div>
       </main>
     </div>

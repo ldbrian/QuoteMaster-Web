@@ -97,6 +97,17 @@ export default function Dashboard() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
+  // 🌟 新增：侦听当前选中的询盘，如果状态变成 completed，自动拉取最新的详细报价数据
+  useEffect(() => {
+    if (selectedInquiryId) {
+      const currentLead = leads.find(l => l.id === selectedInquiryId);
+      // 如果列表状态已经是 completed，但面板还没有拿到数据 (detailData.plans 不存在)
+      if (currentLead && currentLead.status === 'completed' && (!detailData || !detailData.plans)) {
+        handleOpenDetail(currentLead);
+      }
+    }
+  }, [leads, selectedInquiryId, detailData]);
+  
   const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
@@ -266,6 +277,42 @@ export default function Dashboard() {
     } catch (error: any) {
       alert('删除失败: ' + error.message);
       fetchLeads(); 
+    }
+  };
+
+  // 🌟 新增：处理详情页的 AI 指令重算
+  const handleDetailRetry = async (userNote: string) => {
+    if (profile && profile.tier === 'free' && remainingQuota <= 0) {
+      setShowPayModal(true);
+      return;
+    }
+    if (!selectedInquiryId) return;
+
+    // 1. 乐观更新：立刻让面板进入 Loading 状态
+    const nowISO = new Date().toISOString();
+    setLeads(prev => prev.map(l => l.id === selectedInquiryId ? { ...l, status: 'analyzing', created_at: nowISO } : l));
+    
+    // 清空旧的详情数据，触发 Loading 动画
+    setDetailData(null); 
+
+    try {
+      // 2. 发送指令到数据库
+      const { error } = await supabase.from('inquiries').update({ 
+        status: 'analyzing', 
+        created_at: nowISO,
+        user_prompt: userNote // 将用户的微调指令传给后端
+      }).eq('id', selectedInquiryId);
+
+      if (error) throw error;
+
+      // 3. 扣除算力
+      const newUsage = (profile?.usage_count || 0) + 1;
+      await supabase.from('profiles').update({ usage_count: newUsage }).eq('id', user.id);
+      if(user) fetchUserProfile(user.id);
+
+    } catch (error) {
+      alert("网络异常，指令发送失败，请重试！");
+      fetchLeads();
     }
   };
 
@@ -469,6 +516,7 @@ export default function Dashboard() {
             status: 'completed' 
           } : null)
         } 
+        onRetry={handleDetailRetry}
       />
 
       {showTaskModal && (
