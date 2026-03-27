@@ -279,7 +279,8 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 新增：处理详情页的 AI 指令重算
+  
+ // 🌟 最新版：处理详情页的 AI 指令重算（带硬核报错追踪）
   const handleDetailRetry = async (userNote: string) => {
     if (profile && profile.tier === 'free' && remainingQuota <= 0) {
       setShowPayModal(true);
@@ -287,30 +288,28 @@ export default function Dashboard() {
     }
     if (!selectedInquiryId) return;
 
-    // 1. 乐观更新：立刻让面板进入 Loading 状态
     const nowISO = new Date().toISOString();
     setLeads(prev => prev.map(l => l.id === selectedInquiryId ? { ...l, status: 'analyzing', created_at: nowISO } : l));
-    
-    // 清空旧的详情数据，触发 Loading 动画
     setDetailData(null); 
 
     try {
-      // 2. 发送指令到数据库
       const { error } = await supabase.from('inquiries').update({ 
         status: 'analyzing', 
         created_at: nowISO,
-        user_prompt: userNote // 将用户的微调指令传给后端
+        user_prompt: userNote 
       }).eq('id', selectedInquiryId);
 
-      if (error) throw error;
+      // 如果数据库返回错误，强行抛出，让下面的 catch 抓住它
+      if (error) throw error; 
 
-      // 3. 扣除算力
       const newUsage = (profile?.usage_count || 0) + 1;
       await supabase.from('profiles').update({ usage_count: newUsage }).eq('id', user.id);
       if(user) fetchUserProfile(user.id);
 
     } catch (error) {
-      alert("网络异常，指令发送失败，请重试！");
+      // 🔥 关键在这里！强行打印死因！
+      console.error("🔥抓到真凶了，数据库拒绝原因：", error);
+      alert("错误已打印在浏览器控制台，请按 F12 查看！");
       fetchLeads();
     }
   };
