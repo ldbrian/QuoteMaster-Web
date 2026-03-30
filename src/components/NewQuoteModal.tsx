@@ -169,8 +169,8 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
       if (dbError) throw dbError;
 
       // 执行底层扣费 (调用 DB RPC)
-      const { error: rpcError } = await supabase.rpc('increment_usage_count', { user_id: userId });
-      if (rpcError) console.error("扣费执行失败:", rpcError);
+      //const { error: rpcError } = await supabase.rpc('increment_usage_count', { user_id: userId });
+      //if (rpcError) console.error("扣费执行失败:", rpcError);
 
       onSuccess();
       onClose();

@@ -5,7 +5,7 @@ import { supabase } from '@/src/utils/supabase/client';
 import { useRouter } from 'next/navigation'; 
 import NewQuoteModal from '@/src/components/NewQuoteModal'; 
 import QuoteDetailPanel from '@/src/components/QuoteDetailPanel';
-import { trackEvent } from '@/src/utils/analytics'; // 引入埋点发报机
+import { trackEvent } from '@/src/utils/analytics'; 
 import { 
   Search, Bell, Plus, MoreVertical, LogOut,
   LayoutGrid, FileText, Users, MessageSquare, 
@@ -45,24 +45,14 @@ export default function Dashboard() {
 
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showUploadQuoteModal, setShowUploadQuoteModal] = useState(false);
-
   const [uploadQuoteDate, setUploadQuoteDate] = useState('1month');
-
-  const [showPhoneModal, setShowPhoneModal] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [countdown, setCountdown] = useState(0);
-  const [isSending, setIsSending] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
 
   const router = useRouter();
 
+  // 🌟 核心修复 1：绝对信任数据库的新字段 credits_balance
   const remainingQuota = useMemo(() => {
     if (!profile) return 0;
-    const base = 15;
-    const bonus = profile.bonus_quota || 0;
-    const used = profile.usage_count || 0;
-    return Math.max(0, base + bonus - used);
+    return profile.credits_balance || 0;
   }, [profile]);
 
   useEffect(() => {
@@ -74,7 +64,6 @@ export default function Dashboard() {
         setUser(session.user);
         fetchLeads();
         fetchUserProfile(session.user.id); 
-        // 📊 埋点 1：用户进入了工作台
         trackEvent('view_dashboard', {}, session.user.id);
       }
     };
@@ -82,29 +71,8 @@ export default function Dashboard() {
   }, [router]);
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && user) {
-        fetchLeads();
-        fetchUserProfile(user.id);
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [user]);
-
-  useEffect(() => {
-    let timer: any;
-    if (countdown > 0) {
-      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [countdown]);
-
-  // 🌟 新增：侦听当前选中的询盘，如果状态变成 completed，自动拉取最新的详细报价数据
-  useEffect(() => {
     if (selectedInquiryId) {
       const currentLead = leads.find(l => l.id === selectedInquiryId);
-      // 如果列表状态已经是 completed，但面板还没有拿到数据 (detailData.plans 不存在)
       if (currentLead && currentLead.status === 'completed' && (!detailData || !detailData.plans)) {
         handleOpenDetail(currentLead);
       }
@@ -116,7 +84,8 @@ export default function Dashboard() {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
       if (data) {
         setProfile(data);
-        if (data.tier === 'free' && data.usage_count === 0 && !localStorage.getItem('giftClaimed')) {
+        // 🌟 核心修复 2：用 total_usage_count 判断是否发新手礼包
+        if (data.tier === 'free' && data.total_usage_count === 0 && !localStorage.getItem('giftClaimed')) {
           setShowGiftModal(true);
         }
       }
@@ -133,88 +102,11 @@ export default function Dashboard() {
 
   const handleNewQuoteClick = () => {
     if (profile && profile.tier === 'free' && remainingQuota <= 0) {
-      // 📊 埋点 2：极其重要！用户用光额度后撞到了付费墙！
       trackEvent('hit_paywall', { source: 'new_quote_btn' }, user?.id);
       setShowPayModal(true); 
     } else {
-      // 📊 埋点 3：用户点击了新建按钮
       trackEvent('click_new_quote', {}, user?.id);
       setIsModalOpen(true); 
-    }
-  };
-
-  const handleSendOtp = async () => {
-    if (!/^1[3-9]\d{9}$/.test(phoneNumber)) {
-      alert("请输入正确的中国大陆11位手机号码！");
-      return;
-    }
-    setIsSending(true);
-    try {
-      const res = await fetch('/api/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneNumber })
-      });
-      
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const textError = await res.text();
-        throw new Error("服务器拥堵或密钥未配置，请稍后再试！");
-      }
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "发送失败，请检查手机号或配置");
-      
-      setCountdown(60); 
-      alert("验证码已火速发出，请查看手机！");
-    } catch (error: any) {
-      alert(error.message);
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (otpCode.length < 4) {
-      alert("请输入完整的验证码！");
-      return;
-    }
-    setIsVerifying(true);
-    try {
-      if (otpCode === '888888') { 
-        const newBonus = (profile.bonus_quota || 0) + 5;
-        await supabase.from('profiles').update({ phone_verified: true, phone: phoneNumber, bonus_quota: newBonus }).eq('id', user.id);
-        alert("🎉 [测试通道] 绑定成功！已为您下发 5 次专属奖励额度！");
-        fetchUserProfile(user.id);
-        setShowPhoneModal(false);
-        return;
-      }
-
-      const res = await fetch('/api/verify-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneNumber, code: otpCode, userId: user?.id })
-      });
-      
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || "验证码错误或已过期");
-
-      const newBonus = (profile.bonus_quota || 0) + 5;
-      await supabase.from('profiles').update({ 
-        phone_verified: true, 
-        phone: phoneNumber,
-        bonus_quota: newBonus 
-      }).eq('id', user.id);
-
-      alert("🎉 绑定成功！真实的 5 次奖励额度已下发！");
-      fetchUserProfile(user.id); 
-      setShowPhoneModal(false);
-      setShowTaskModal(false);
-      
-    } catch (error: any) {
-      alert(error.message);
-    } finally {
-      setIsVerifying(false);
     }
   };
 
@@ -223,27 +115,14 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase.from('inquiries').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      const now = new Date().getTime();
-      const TIMEOUT_MS = 3 * 60 * 1000; 
-      let hasUpdates = false;
-      const processedData = data?.map((lead) => {
-        if (lead.status === 'analyzing') {
-          const leadTime = new Date(lead.created_at).getTime();
-          if (now - leadTime > TIMEOUT_MS) {
-            hasUpdates = true;
-            supabase.from('inquiries').update({ status: 'failed' }).eq('id', lead.id).then();
-            return { ...lead, status: 'failed' }; 
-          }
-        }
-        return lead;
-      });
-      setLeads(processedData || []);
+      setLeads(data || []);
     } catch (error) {
     } finally {
       setLoading(false);
     }
   };
 
+  // 🌟 核心修复 3：重试任务，只改变状态，绝不越权扣费！
   const handleRetry = async (lead: any, e: React.MouseEvent) => {
     e.stopPropagation(); 
     if (profile && profile.tier === 'free' && remainingQuota <= 0) {
@@ -252,23 +131,20 @@ export default function Dashboard() {
     }
     
     const nowISO = new Date().toISOString();
-    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'analyzing', created_at: nowISO } : l));
+    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'pending', created_at: nowISO } : l));
     
     try {
+      // 只需要把状态改成 pending，唤醒 worker 即可
       const { error } = await supabase.from('inquiries').update({ 
-        status: 'analyzing', 
+        status: 'pending', 
         created_at: nowISO,
         user_prompt: "重试核价任务" 
       }).eq('id', lead.id);
 
       if (error) throw error;
-
-      const newUsage = (profile?.usage_count || 0) + 1;
-      await supabase.from('profiles').update({ usage_count: newUsage }).eq('id', user.id);
-      if(user) fetchUserProfile(user.id);
-
+      // 🚫 删除了前端自己扣费的代码，保障系统安全！
     } catch (error) {
-      console.error("🔥抓到真凶了，数据库拒绝原因：", error);
+      console.error("重试失败：", error);
       alert("错误已打印在控制台，请按 F12 查看！");
     }
   };
@@ -286,8 +162,7 @@ export default function Dashboard() {
     }
   };
 
-  
- // 🌟 最新版：处理详情页的 AI 指令重算（带硬核报错追踪）
+  // 🌟 核心修复 4：AI 详情重算，只改状态，绝不越权扣费！
   const handleDetailRetry = async (userNote: string) => {
     if (profile && profile.tier === 'free' && remainingQuota <= 0) {
       setShowPayModal(true);
@@ -296,35 +171,31 @@ export default function Dashboard() {
     if (!selectedInquiryId) return;
 
     const nowISO = new Date().toISOString();
-    setLeads(prev => prev.map(l => l.id === selectedInquiryId ? { ...l, status: 'analyzing', created_at: nowISO } : l));
+    setLeads(prev => prev.map(l => l.id === selectedInquiryId ? { ...l, status: 'pending', created_at: nowISO } : l));
     setDetailData(null); 
 
     try {
       const { error } = await supabase.from('inquiries').update({ 
-        status: 'analyzing', 
+        status: 'pending', 
         created_at: nowISO,
         user_prompt: userNote 
       }).eq('id', selectedInquiryId);
 
-      // 如果数据库返回错误，强行抛出，让下面的 catch 抓住它
       if (error) throw error; 
-
-      const newUsage = (profile?.usage_count || 0) + 1;
-      await supabase.from('profiles').update({ usage_count: newUsage }).eq('id', user.id);
-      if(user) fetchUserProfile(user.id);
+      // 🚫 删除了前端自己扣费的代码！
 
     } catch (error) {
-      // 🔥 关键在这里！强行打印死因！
-      console.error("🔥抓到真凶了，数据库拒绝原因：", error);
+      console.error("重算失败：", error);
       alert("错误已打印在浏览器控制台，请按 F12 查看！");
       fetchLeads();
     }
   };
 
+  // 监听数据库实时变动，当 Worker 扣费或改状态时，自动刷新 UI
   useEffect(() => {
     const channel = supabase.channel('realtime-inquiries').on('postgres_changes', { event: '*', schema: 'public', table: 'inquiries' }, (payload) => {
       fetchLeads(); 
-      if(user) fetchUserProfile(user.id); 
+      if(user) fetchUserProfile(user.id); // Worker 扣完费，这里会自动拉取最新余额！
     }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
@@ -337,7 +208,7 @@ export default function Dashboard() {
   }, [leads]);
 
   const handleOpenDetail = async (lead: any) => {
-    if (lead.status === 'analyzing') return;
+    if (lead.status === 'analyzing' || lead.status === 'pending') return;
     setSelectedInquiryId(lead.id);
     setDetailData(lead); 
     try {
@@ -382,7 +253,6 @@ export default function Dashboard() {
           <div className="mt-4 mb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
             <Flame size={12} className="text-rose-500 animate-pulse" /> 商业情报 (AI 赋能)
           </div>
-          {/* 🌟 核心修改：加入了爆款趋势分析和雷达的入口展示 */}
           <div onClick={() => alert("🔥 【AI 爆款趋势分析】\n\n该功能目前已静默集成在『新建核价』流程中。AI 会在分析成本时，自动从 TikTok/Instagram 提取匹配的款式热词，生成对客营销话术。")}>
             <NavItem icon={<TrendingUp size={20} />} label="AI 爆款趋势分析" badge="已激活" />
           </div>
@@ -424,7 +294,6 @@ export default function Dashboard() {
             <div className="flex items-center gap-3 md:gap-4">
               <div className="text-right hidden md:block">
                 <p className="text-sm font-bold text-slate-700 leading-none">{user.email?.split('@')[0] || 'Admin'}</p>
-                {/* 🌟 这里是你刚才提到的额度显示位置，已经与 remainingQuota 挂钩 */}
                 {profile ? (
                   profile.tier === 'free' ? (
                     <div onClick={() => setShowTaskModal(true)} className="cursor-pointer text-[11px] text-blue-600 font-bold mt-1.5 flex items-center justify-end gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-full border border-blue-200 shadow-sm transition-colors" title="点击获取更多额度">
