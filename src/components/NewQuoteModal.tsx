@@ -135,10 +135,10 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
     setShowTollbooth(false);
     setUploading(true);
     // 📊 埋点 5：全站最核心动作！用户真正消耗算力发起了请求
-    trackEvent('execute_ai_quote', { 
-      image_count: files.length, 
-      has_prompt: !!note 
-    }, userId);
+    //trackEvent('execute_ai_quote', { 
+     // image_count: files.length, 
+     // has_prompt: !!note 
+   // }, userId);
 
     try {
       const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/jpeg', initialQuality: 0.8 };
