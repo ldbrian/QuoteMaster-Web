@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Upload, Loader2, Trash2, Sparkles, PlayCircle, ShieldCheck, Zap, Crown } from 'lucide-react'; 
 import { supabase } from '@/src/utils/supabase/client'; 
 import imageCompression from 'browser-image-compression';
+import { trackEvent } from '@/src/utils/analytics'; // 引入埋点发报机
 
 // 🌟 核心机密：提前焊死的完美演示数据 (已升级至 v2 动态多方案引擎架构)
 const DEMO_CASES = [
@@ -133,6 +134,11 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
   const executeSubmit = async () => {
     setShowTollbooth(false);
     setUploading(true);
+    // 📊 埋点 5：全站最核心动作！用户真正消耗算力发起了请求
+    trackEvent('execute_ai_quote', { 
+      image_count: files.length, 
+      has_prompt: !!note 
+    }, userId);
 
     try {
       const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/jpeg', initialQuality: 0.8 };
@@ -271,6 +277,8 @@ export default function NewQuoteModal({ isOpen, onClose, onSuccess, onSelectDemo
                 <div 
                   key={demo.id} 
                   onClick={() => {
+                    // 📊 埋点 6：用户使用了演示数据体验功能
+                    trackEvent('use_demo_case', { demo_id: demo.id }, userId);
                     if (onSelectDemo) {
                       onSelectDemo(demo.quoteData);
                       onClose(); 

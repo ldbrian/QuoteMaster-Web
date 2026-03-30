@@ -5,6 +5,7 @@ import { supabase } from '@/src/utils/supabase/client';
 import { useRouter } from 'next/navigation'; 
 import NewQuoteModal from '@/src/components/NewQuoteModal'; 
 import QuoteDetailPanel from '@/src/components/QuoteDetailPanel';
+import { trackEvent } from '@/src/utils/analytics'; // 引入埋点发报机
 import { 
   Search, Bell, Plus, MoreVertical, LogOut,
   LayoutGrid, FileText, Users, MessageSquare, 
@@ -73,6 +74,8 @@ export default function Dashboard() {
         setUser(session.user);
         fetchLeads();
         fetchUserProfile(session.user.id); 
+        // 📊 埋点 1：用户进入了工作台
+        trackEvent('view_dashboard', {}, session.user.id);
       }
     };
     checkAuth();
@@ -130,8 +133,12 @@ export default function Dashboard() {
 
   const handleNewQuoteClick = () => {
     if (profile && profile.tier === 'free' && remainingQuota <= 0) {
+      // 📊 埋点 2：极其重要！用户用光额度后撞到了付费墙！
+      trackEvent('hit_paywall', { source: 'new_quote_btn' }, user?.id);
       setShowPayModal(true); 
     } else {
+      // 📊 埋点 3：用户点击了新建按钮
+      trackEvent('click_new_quote', {}, user?.id);
       setIsModalOpen(true); 
     }
   };

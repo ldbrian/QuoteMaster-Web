@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'; 
 import { supabase } from '@/src/utils/supabase/client'; 
 import ExportPreviewModal from './ExportPreviewModal';
+import { trackEvent } from '@/src/utils/analytics'; // 引入埋点发报机
 
 interface QuoteDetailPanelProps {
   isOpen: boolean;
@@ -51,6 +52,8 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
 
   const handleCopy = (text: string, type: 'client' | 'factory') => {
     navigator.clipboard.writeText(text);
+    // 📊 埋点 7：记录用户复制了哪种话术
+    trackEvent('copy_pitch_text', { pitch_type: type }, inquiry?.user_id);
     if (type === 'client') {
       setIsCopiedClient(true);
       setTimeout(() => setIsCopiedClient(false), 2000);
@@ -109,6 +112,8 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
 
   // 🌟 反转逻辑 2：确认扣除后真正发送给外部 onRetry
   const confirmRetry = () => {
+    // 📊 埋点 9：用户使用了 AI 纠错微调功能
+    trackEvent('execute_ai_refine', { note_length: retryNote.length }, inquiry?.user_id);
     if (onRetry) {
       onRetry(retryNote);
     }
@@ -362,7 +367,11 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                       </button>
                       {/* 🌟 反转逻辑 3：生成 PDF 不再拦截，直接放行触发 Modal */}
                       <button 
-                        onClick={() => setShowExportModal(true)} 
+                        onClick={() => {
+                          // 📊 埋点 8：用户导出了 PDF 提案！
+                          trackEvent('export_pdf', { plan_type: activeTab }, inquiry?.user_id);
+                          setShowExportModal(true);
+                        }} 
                         className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-blue-600/30 hover:bg-blue-700 hover:-translate-y-0.5 transition-all flex items-center gap-2"
                       >
                         <FileText className="w-5 h-5" /> 渲染客户 PDF

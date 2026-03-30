@@ -1,11 +1,21 @@
-import React from 'react';
+'use client'; // 🌟 核心修改 1：必须加上这行，因为我们要用 useEffect 和 onClick 来追踪用户行为
+
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { 
   ArrowRight, Zap, ShieldAlert, CheckCircle2, 
   TrendingUp, Lock, Target, Gift
 } from 'lucide-react';
+import { trackEvent } from '@/src/utils/analytics'; // 🌟 核心修改 2：引入埋点发报机
 
 export default function LandingPage() {
+
+  // 📊 埋点 1：漏斗的最顶端 —— 监控首页曝光 (PV/UV)
+  useEffect(() => {
+    // 只要用户打开了这个网页，立刻发送一条记录
+    trackEvent('view_landing_page');
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-200">
       
@@ -19,10 +29,21 @@ export default function LandingPage() {
             <span className="font-bold text-xl tracking-tight text-slate-800">QuoteMaster</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors">
+            {/* 📊 埋点 2：监控右上角“登录”按钮的点击率 */}
+            <Link 
+              href="/dashboard" 
+              onClick={() => trackEvent('click_nav_login')} 
+              className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
+            >
               登录工作台
             </Link>
-            <Link href="/dashboard" className="px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-full transition-all active:scale-95 flex items-center gap-1.5">
+            
+            {/* 📊 埋点 3：监控右上角“诱饵”按钮的点击率 */}
+            <Link 
+              href="/dashboard" 
+              onClick={() => trackEvent('click_nav_claim_gift')}
+              className="px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-full transition-all active:scale-95 flex items-center gap-1.5"
+            >
               <Gift size={14} /> 领取 15 次核价算力
             </Link>
           </div>
@@ -49,12 +70,18 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-            <Link href="/dashboard" className="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-300 hover:-translate-y-1 transition-all flex items-center justify-center gap-2">
+            {/* 📊 埋点 4：监控首屏主按钮 (Hero CTA) 的点击率 */}
+            <Link 
+              href="/dashboard" 
+              onClick={() => trackEvent('click_hero_cta')}
+              className="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-300 hover:-translate-y-1 transition-all flex items-center justify-center gap-2"
+            >
               进入工作台 (注册即赠 15 次高阶算力) <ArrowRight size={20} />
             </Link>
           </div>
         </div>
 
+        {/* ... (下方痛点对比区代码保持不变) ... */}
         {/* 痛点对比区 (Judo Strategy) */}
         <div className="max-w-6xl mx-auto mt-32 grid md:grid-cols-2 gap-12 items-center">
           
