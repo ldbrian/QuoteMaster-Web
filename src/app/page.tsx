@@ -1,18 +1,17 @@
-'use client'; // 🌟 核心修改 1：必须加上这行，因为我们要用 useEffect 和 onClick 来追踪用户行为
+'use client'; 
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { 
-  ArrowRight, Zap, ShieldAlert, CheckCircle2, 
-  TrendingUp, Lock, Target, Gift
+  ArrowRight, ShieldAlert, TrendingUp, Lock, Gift, Crown, 
+  AlertTriangle, CheckCircle2, BarChart3, Layers, Zap
 } from 'lucide-react';
-import { trackEvent } from '@/src/utils/analytics'; // 🌟 核心修改 2：引入埋点发报机
+import { trackEvent } from '@/src/utils/analytics'; 
 
 export default function LandingPage() {
 
   // 📊 埋点 1：漏斗的最顶端 —— 监控首页曝光 (PV/UV)
   useEffect(() => {
-    // 只要用户打开了这个网页，立刻发送一条记录
     trackEvent('view_landing_page');
   }, []);
 
@@ -23,26 +22,24 @@ export default function LandingPage() {
       <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-slate-100 z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-sm">
               Q
             </div>
             <span className="font-bold text-xl tracking-tight text-slate-800">QuoteMaster</span>
           </div>
           <div className="flex items-center gap-4">
-            {/* 📊 埋点 2：监控右上角“登录”按钮的点击率 */}
             <Link 
               href="/dashboard" 
               onClick={() => trackEvent('click_nav_login')} 
-              className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
+              className="text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors hidden sm:block"
             >
               登录工作台
             </Link>
             
-            {/* 📊 埋点 3：监控右上角“诱饵”按钮的点击率 */}
             <Link 
               href="/dashboard" 
               onClick={() => trackEvent('click_nav_claim_gift')}
-              className="px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-full transition-all active:scale-95 flex items-center gap-1.5"
+              className="px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-600 hover:text-white rounded-full transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
             >
               <Gift size={14} /> 领取 15 次核价算力
             </Link>
@@ -50,97 +47,161 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero 首屏 */}
-      <main className="pt-32 pb-20 px-6">
+      {/* 🚀 首屏 (Hero) - 一击命中 */}
+      <main className="pt-32 pb-16 px-6">
         <div className="max-w-5xl mx-auto text-center space-y-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-sm font-medium mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <Zap size={16} className="fill-blue-600" />
-            <span>专为高阶外贸业务员打造的 AI 谈判辅助 SaaS</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-sm font-bold mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-sm">
+            <Crown size={16} className="text-amber-500" />
+            <span>你不是不会报价，你只是没有老鸟的那套算法</span>
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.1] animate-in fade-in slide-in-from-bottom-6 duration-700">
-            告别底价内卷，把定价权握在手里。<br />
+          <h1 className="text-5xl md:text-7xl font-black tracking-tight text-slate-900 leading-[1.1] animate-in fade-in slide-in-from-bottom-6 duration-700">
+            30 秒，让你报出一个<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-500">
-              用 AI 打造无法拒绝的商业提案。
+              像干了 10 年的价格。
             </span>
           </h1>
           
-          <p className="max-w-3xl mx-auto text-lg md:text-xl text-slate-500 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000">
-            不仅是极速核价工具，更是你的全能谈判助理。上传询盘图片，AI 自动预判全球流行趋势，3秒拆解底层 BOM，并为你智能生成“高低搭配”的阶梯报价与对客营销话术。
-          </p>
+          <div className="max-w-3xl mx-auto text-lg md:text-xl text-slate-600 leading-relaxed font-medium animate-in fade-in slide-in-from-bottom-8 duration-1000 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mt-8">
+            同一张询盘图片，新手报 $5 被嫌贵，老业务员报 $6.2 反而成交。<br/>
+            <strong className="text-slate-900">差的不是价格，而是你的“报价逻辑”。</strong>
+          </div>
           
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-            {/* 📊 埋点 4：监控首屏主按钮 (Hero CTA) 的点击率 */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6 animate-in fade-in slide-in-from-bottom-10 duration-1000">
             <Link 
               href="/dashboard" 
               onClick={() => trackEvent('click_hero_cta')}
-              className="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-300 hover:-translate-y-1 transition-all flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-10 py-4 text-base font-black text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-xl shadow-blue-600/30 hover:-translate-y-1 transition-all flex items-center justify-center gap-2"
             >
-              进入工作台 (注册即赠 15 次高阶算力) <ArrowRight size={20} />
+              免费试用 (送 15 次防坑算力) <ArrowRight size={20} />
             </Link>
           </div>
         </div>
 
-        {/* ... (下方痛点对比区代码保持不变) ... */}
-        {/* 痛点对比区 (Judo Strategy) */}
-        <div className="max-w-6xl mx-auto mt-32 grid md:grid-cols-2 gap-12 items-center">
-          
-          {/* 传统的痛点 */}
-          <div className="bg-white p-8 md:p-10 rounded-3xl border border-red-100 shadow-xl shadow-red-50/50 relative">
-            <div className="absolute top-0 right-0 p-6 opacity-10">
-              <ShieldAlert size={100} className="text-red-500" />
-            </div>
-            <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center mb-6 border border-red-100 relative z-10">
-              <ShieldAlert size={24} className="text-red-500" />
-            </div>
-            <h3 className="text-2xl font-bold mb-6 text-slate-800 relative z-10">传统外贸报价的“漏斗与风险”</h3>
-            <ul className="space-y-5 relative z-10">
-              <li className="flex items-start gap-3 text-slate-600">
-                <span className="shrink-0 w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-sm font-bold mt-0.5">1</span>
-                <span><strong className="text-slate-800">底价与工艺“裸奔”：</strong>直接把内控 Excel 发给海外买家，极易陷入无休止的低价拉锯战，甚至面临客户绕过业务员直接找源头工厂的风险。</span>
-              </li>
-              <li className="flex items-start gap-3 text-slate-600">
-                <span className="shrink-0 w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-sm font-bold mt-0.5">2</span>
-                <span><strong className="text-slate-800">单一报价死局：</strong>只给一个冷冰冰的数字，报高了吓跑客户，报低了伤及利润。缺乏谈判桌上的弹性筹码与选择空间。</span>
-              </li>
-              <li className="flex items-start gap-3 text-slate-600">
-                <span className="shrink-0 w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-sm font-bold mt-0.5">3</span>
-                <span><strong className="text-slate-800">缺乏商业包装与说服力：</strong>难以提炼款式背后的流行趋势与附加值，无法通过专业度引导海外客户加注高利润订单。</span>
-              </li>
-            </ul>
+        {/* ⚠️ 情绪共鸣区 (Pain Points) */}
+        <div className="max-w-6xl mx-auto mt-24">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-black text-slate-800 mb-4">外贸最残酷的一点是：报价错一次，你可能直接出局。</h2>
+            <p className="text-slate-500">你是不是也经历过这 3 种崩溃瞬间？</p>
           </div>
-
-          {/* 我们的方案 */}
-          <div className="bg-gradient-to-br from-blue-700 to-indigo-900 p-8 md:p-10 rounded-3xl shadow-2xl shadow-blue-900/30 text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
-            <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-6 border border-white/20 relative z-10">
-              <Zap size={24} className="text-blue-100" />
+          
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+              <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center mb-6 border border-rose-100">
+                <ShieldAlert size={24} className="text-rose-500" />
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-slate-800">恐惧：根本不知道这价安不安全</h3>
+              <p className="text-slate-600 text-sm leading-relaxed">客户发来图问价。你内心极其挣扎：报高了，客户直接消失 (Ghosted)；报低了，一旦接单可能做一单亏一单。</p>
             </div>
-            <h3 className="text-2xl font-bold mb-6 text-white relative z-10">QuoteMaster 业务赋能引擎</h3>
-            <ul className="space-y-5 relative z-10">
-              <li className="flex items-start gap-3 text-blue-100">
-                <Target className="shrink-0 text-amber-400 mt-1" size={20} />
-                <span><strong className="text-white text-lg block mb-1">A/B/C 三阶方案矩阵</strong>一键生成“性价比跑量 / 标准对标 / 高端精品”方案。用高低搭配为客户提供选择题，有效提升询盘转化率。</span>
-              </li>
-              <li className="flex items-start gap-3 text-blue-100">
-                <TrendingUp className="shrink-0 text-purple-400 mt-1" size={20} />
-                <span><strong className="text-white text-lg block mb-1">爆款雷达与金牌跟单话术</strong>自动提取欧美时尚标签，拆分生成地道的“对客英文营销话术”与“对内中文压价策略”，让新手也能展现老手风范。</span>
-              </li>
-              <li className="flex items-start gap-3 text-blue-100">
-                <Lock className="shrink-0 text-emerald-400 mt-1" size={20} />
-                <span><strong className="text-white text-lg block mb-1">B2B 数据防火墙</strong>内部全盘掌控精细 BOM 成本；对外一键导出过滤敏感数据的“净化版” PDF，打上水印，彻底保护公司利润基密。</span>
-              </li>
-            </ul>
+
+            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mb-6 border border-slate-200">
+                <TrendingUp size={24} className="text-slate-600" />
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-slate-800">碾压：被同行的高价无情截胡</h3>
+              <p className="text-slate-600 text-sm leading-relaxed">你的价格明明比同行便宜 20%，客户却选了他。因为对方甩出了一份极其专业的 BOM 拆解，而你只给了一个冷冰冰的数字。</p>
+            </div>
+
+            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center mb-6 border border-amber-200">
+                <AlertTriangle size={24} className="text-amber-500" />
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-slate-800">死局：没资源没人带的盲人摸象</h3>
+              <p className="text-slate-600 text-sm leading-relaxed">没有靠谱的源头工厂资源，没有老业务员带你。拿不准面料单耗，算不清克重，每一单的报价都像在赌博。</p>
+            </div>
           </div>
         </div>
 
-        {/* 底部信任条 */}
-        <div className="max-w-4xl mx-auto mt-32 text-center border-t border-slate-200 pt-12 pb-8">
-          <p className="text-slate-500 font-medium mb-6 flex items-center justify-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-            QuoteMaster AI Engine™ - 您的全能外贸谈判助理
+        {/* 🛡️ 解决方案区 (Features) */}
+        <div className="max-w-6xl mx-auto mt-32 bg-slate-900 rounded-[2.5rem] p-10 md:p-16 text-white shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600 opacity-20 rounded-full blur-[100px] transform translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+          
+          <div className="relative z-10 text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-black mb-4">我们做的不是报价工具，</h2>
+            <h2 className="text-3xl md:text-4xl font-black text-blue-400">而是把你欠缺的 10 年经验，写成了系统。</h2>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-12 relative z-10">
+            <div className="space-y-10">
+              <div className="flex gap-4">
+                <div className="w-12 h-12 bg-blue-500/20 border border-blue-400/30 rounded-2xl flex items-center justify-center shrink-0">
+                  <Layers className="text-blue-400" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-2">行业潜规则：双引擎报价系统</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">以为所有衣服都套一个公式？系统内置 Woven (梭织算面积与单耗) 和 Knit (针织算克重与工时) 独立引擎。不是帮你算价格，是帮你选对底层算法。</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="w-12 h-12 bg-emerald-500/20 border border-emerald-400/30 rounded-2xl flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="text-emerald-400" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-2">逼单神器：A/B 双阶梯谈判策略</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">还在和客户说“这个价格做不了”？系统每次自动生成 Plan A (原版高配撑认知) 和 Plan B (平替材料跑量版)，附带高情商对客英文话术。本质是帮客户做利润设计。</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="w-12 h-12 bg-purple-500/20 border border-purple-400/30 rounded-2xl flex items-center justify-center shrink-0">
+                  <BarChart3 className="text-purple-400" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-2">30秒摸清底牌：安全区间揭秘</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">无需实物，扔几张网图进去，30秒输出底层 BOM 结构、每一项的预估成本及防亏底线区间。你不再是“猜价格”，而是在“做决策”。</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-800 border border-slate-700 rounded-3xl p-6 shadow-2xl relative flex flex-col justify-center transform md:rotate-2 hover:rotate-0 transition-transform duration-500">
+              <div className="absolute -top-4 -right-4 bg-amber-500 text-slate-900 font-black px-4 py-1.5 rounded-full shadow-lg transform rotate-12 text-sm">
+                内部真实界面演示
+              </div>
+              <img src="/demo-interface.jpg" alt="QuoteMaster 界面演示" className="rounded-xl border border-slate-600 shadow-inner bg-slate-900 w-full h-auto object-cover min-h-[300px] fallback-bg" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+              <div className="hidden absolute inset-0 m-6 rounded-xl border-2 border-dashed border-slate-600 flex flex-col items-center justify-center text-slate-500">
+                <Lock size={32} className="mb-2 opacity-50" />
+                <span className="font-bold text-sm">登录工作台后查看极速解析引擎</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 💰 价格锚点与最终转化 (Pricing Anchor) */}
+        <div className="max-w-4xl mx-auto mt-32 text-center">
+          <div className="inline-block bg-rose-50 border border-rose-200 text-rose-600 px-6 py-2 rounded-full font-bold mb-8 shadow-sm">
+            算一笔账：你现在的报价方式，其实更贵。
+          </div>
+          <h2 className="text-4xl font-black text-slate-900 mb-6">报错一单亏 $200 (¥1400)</h2>
+          <p className="text-xl text-slate-600 mb-10 font-medium">而 QuoteMaster Pro，<strong className="text-blue-600">每天只要不到一杯奶茶钱</strong>。</p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link 
+              href="/dashboard" 
+              onClick={() => trackEvent('click_footer_cta_free')}
+              className="w-full sm:w-auto px-8 py-4 text-base font-bold text-slate-700 bg-white border-2 border-slate-200 hover:border-blue-400 hover:text-blue-600 rounded-full shadow-sm transition-all"
+            >
+              先白嫖 15 次测一下
+            </Link>
+            <Link 
+              href="/dashboard" 
+              onClick={() => trackEvent('click_footer_cta_pro')}
+              className="w-full sm:w-auto px-10 py-4 text-base font-black text-white bg-slate-900 hover:bg-slate-800 rounded-full shadow-xl shadow-slate-900/20 hover:-translate-y-1 transition-all flex items-center justify-center gap-2"
+            >
+              <Crown size={20} className="text-amber-400" /> 直接解锁 Pro 无限核价
+            </Link>
+          </div>
+          
+          <p className="mt-8 text-sm text-slate-400 font-medium">
+            你是在买工具吗？不，你是在买 <strong className="text-slate-600 underline underline-offset-4">少亏钱的概率</strong>。
           </p>
-          <p className="text-sm text-slate-400">© {new Date().getFullYear()} QM-AI. All rights reserved.</p>
+        </div>
+
+        <div className="max-w-4xl mx-auto mt-24 border-t border-slate-200 pt-8 pb-4 text-center">
+          <p className="text-xs text-slate-400 flex items-center justify-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            QuoteMaster AI Engine™ · 把定价权握在手里
+          </p>
         </div>
       </main>
     </div>

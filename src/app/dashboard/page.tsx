@@ -11,7 +11,7 @@ import {
   LayoutGrid, FileText, Users, MessageSquare, 
   BarChart2, Settings, Globe, Loader2 ,MessageCircle, Menu, X, Trash2 ,Radar, Flame,
   Gift, Crown, Sparkles, TrendingUp, 
-  Phone, UploadCloud, UserPlus, ChevronRight, CheckCircle2, Copy, ShieldCheck 
+  Phone, UploadCloud, UserPlus, ChevronRight, CheckCircle2, Copy, ShieldCheck, Lock 
 } from 'lucide-react'; 
 
 const statusMap: any = {
@@ -42,6 +42,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<any>(null); 
   const [showGiftModal, setShowGiftModal] = useState(false); 
   const [showPayModal, setShowPayModal] = useState(false); 
+  const [showMilestoneModal, setShowMilestoneModal] = useState(false); // 🌟 第5次使用里程碑
 
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showUploadQuoteModal, setShowUploadQuoteModal] = useState(false);
@@ -49,11 +50,19 @@ export default function Dashboard() {
 
   const router = useRouter();
 
-  // 🌟 核心修复 1：绝对信任数据库的新字段 credits_balance
   const remainingQuota = useMemo(() => {
     if (!profile) return 0;
     return profile.credits_balance || 0;
   }, [profile]);
+
+  const isPro = profile?.tier === 'pro';
+
+  // 🌟 计算被锁定的历史记录数量 (> 7天)
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const oldLeadsCount = useMemo(() => {
+    const nowMs = new Date().getTime();
+    return leads.filter(l => nowMs - new Date(l.created_at).getTime() > SEVEN_DAYS_MS).length;
+  }, [leads]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -84,9 +93,13 @@ export default function Dashboard() {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
       if (data) {
         setProfile(data);
-        // 🌟 核心修复 2：用 total_usage_count 判断是否发新手礼包
         if (data.tier === 'free' && data.total_usage_count === 0 && !localStorage.getItem('giftClaimed')) {
           setShowGiftModal(true);
+        }
+        // 🌟 核心埋点 5：第 5 次使用强制跳出升级引导
+        if (data.tier !== 'pro' && data.total_usage_count === 5 && !localStorage.getItem('milestonePrompted')) {
+          setShowMilestoneModal(true);
+          localStorage.setItem('milestonePrompted', 'true');
         }
       }
     } catch (err) {
@@ -107,23 +120,17 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 终极实时监听：自动刷新列表与算力余额 (已完美解决闭包和重复绑定问题)
   useEffect(() => {
-    if (!user) return; // 必须等 user 获取到才挂载监听
-
+    if (!user) return; 
     const channel = supabase
       .channel('master-realtime-channel')
       .on(
         'postgres_changes',
-        { 
-          event: '*', // 监听任何增删改
-          schema: 'public', 
-          table: 'inquiries' 
-        },
+        { event: '*', schema: 'public', table: 'inquiries' },
         (payload) => {
           console.log('⚡ 接收到 Worker 捷报，触发 UI 无感刷新!', payload);
-          fetchLeads(); // 刷新左侧的核价记录列表
-          fetchUserProfile(user.id); // 刷新右上角的算力余额
+          fetchLeads(); 
+          fetchUserProfile(user.id); 
         }
       )
       .subscribe();
@@ -131,7 +138,7 @@ export default function Dashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]); // 依赖项绑死 user
+  }, [user]); 
 
   const handleClaimGift = () => {
     localStorage.setItem('giftClaimed', 'true');
@@ -149,28 +156,20 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 核心修复 3：重试任务，只改变状态，绝不越权扣费！
   const handleRetry = async (lead: any, e: React.MouseEvent) => {
     e.stopPropagation(); 
     if (profile && profile.tier === 'free' && remainingQuota <= 0) {
       setShowPayModal(true);
       return; 
     }
-    
     const nowISO = new Date().toISOString();
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'pending', created_at: nowISO } : l));
-    
     try {
-      // 只需要把状态改成 pending，唤醒 worker 即可
       const { error } = await supabase.from('inquiries').update({ 
-        status: 'pending', 
-        created_at: nowISO,
-        user_prompt: "重试核价任务" 
+        status: 'pending', created_at: nowISO, user_prompt: "重试核价任务" 
       }).eq('id', lead.id);
-
       if (error) throw error;
     } catch (error) {
-      console.error("重试失败：", error);
       alert("错误已打印在控制台，请按 F12 查看！");
     }
   };
@@ -188,28 +187,21 @@ export default function Dashboard() {
     }
   };
 
-  // 🌟 核心修复 4：AI 详情重算，只改状态，绝不越权扣费！
   const handleDetailRetry = async (userNote: string) => {
     if (profile && profile.tier === 'free' && remainingQuota <= 0) {
       setShowPayModal(true);
       return;
     }
     if (!selectedInquiryId) return;
-
     const nowISO = new Date().toISOString();
     setLeads(prev => prev.map(l => l.id === selectedInquiryId ? { ...l, status: 'pending', created_at: nowISO } : l));
     setDetailData(null); 
-
     try {
       const { error } = await supabase.from('inquiries').update({ 
-        status: 'pending', 
-        created_at: nowISO,
-        user_prompt: userNote 
+        status: 'pending', created_at: nowISO, user_prompt: userNote 
       }).eq('id', selectedInquiryId);
-
       if (error) throw error; 
     } catch (error) {
-      console.error("重算失败：", error);
       alert("错误已打印在浏览器控制台，请按 F12 查看！");
       fetchLeads();
     }
@@ -224,6 +216,16 @@ export default function Dashboard() {
 
   const handleOpenDetail = async (lead: any) => {
     if (lead.status === 'analyzing' || lead.status === 'pending') return;
+    
+    // 🌟 核心埋点 4：历史记录锁定判断
+    const nowMs = new Date().getTime();
+    const isOld = nowMs - new Date(lead.created_at).getTime() > SEVEN_DAYS_MS;
+    if (!isPro && isOld) {
+      trackEvent('hit_paywall', { source: 'history_lock' }, user?.id);
+      setShowPayModal(true);
+      return;
+    }
+
     setSelectedInquiryId(lead.id);
     setDetailData(lead); 
     try {
@@ -280,16 +282,18 @@ export default function Dashboard() {
           <div onClick={handleComingSoon}><NavItem icon={<BarChart2 size={20} />} label="企业成本看板" disabled /></div>
           <div onClick={handleComingSoon}><NavItem icon={<Users size={20} />} label="一键转单/甩单大厅" disabled /></div>
 
-          <div className="mt-6 mx-2 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => setShowTaskModal(true)}>
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles size={16} className="text-amber-500 group-hover:animate-pulse" />
-              <span className="text-xs font-bold text-slate-800">赚取免费额度</span>
+          {!isPro && (
+            <div className="mt-6 mx-2 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => setShowTaskModal(true)}>
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles size={16} className="text-amber-500 group-hover:animate-pulse" />
+                <span className="text-xs font-bold text-slate-800">赚取免费额度</span>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-tight mb-3">上传老订单底价 或 邀请同行，即可解锁算力盲盒。</p>
+              <button className="w-full py-1.5 bg-white border border-blue-200 text-blue-600 rounded text-xs font-bold hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center gap-1">
+                前往任务中心 <ChevronRight size={14} />
+              </button>
             </div>
-            <p className="text-[10px] text-slate-500 leading-tight mb-3">上传老订单底价 或 邀请同行，即可解锁算力盲盒。</p>
-            <button className="w-full py-1.5 bg-white border border-blue-200 text-blue-600 rounded text-xs font-bold hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center gap-1">
-              前往任务中心 <ChevronRight size={14} />
-            </button>
-          </div>
+          )}
         </nav>
       </aside>
 
@@ -310,7 +314,7 @@ export default function Dashboard() {
               <div className="text-right hidden md:block">
                 <p className="text-sm font-bold text-slate-700 leading-none">{user.email?.split('@')[0] || 'Admin'}</p>
                 {profile ? (
-                  profile.tier === 'free' ? (
+                  !isPro ? (
                     <div onClick={() => setShowTaskModal(true)} className="cursor-pointer text-[11px] text-blue-600 font-bold mt-1.5 flex items-center justify-end gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-full border border-blue-200 shadow-sm transition-colors" title="点击获取更多额度">
                       <Gift size={10} /> 剩余 {remainingQuota} 次免费
                     </div>
@@ -352,7 +356,7 @@ export default function Dashboard() {
             {loading ? (
               <div className="flex justify-center items-center h-40 text-slate-400 gap-2"><Loader2 className="animate-spin" /> 数据加载中...</div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto flex flex-col h-full">
                 <table className="w-full text-left">
                   <thead className="bg-slate-50/50 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
                     <tr>
@@ -368,19 +372,35 @@ export default function Dashboard() {
                     {leads.length === 0 ? (
                       <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">暂无核价记录。点击“新建 AI 核价”开始！</td></tr>
                     ) : (
-                      leads.map((lead) => (
-                        <TableRow 
-                          key={lead.id}
-                          img={lead.thumbnail_url ? <img src={lead.thumbnail_url} className="w-10 h-10 object-cover rounded-lg" alt="" /> : "📦"} 
-                          name={lead.product_name || '未知产品'} source={lead.source} region={lead.region || 'Global'} status={lead.status} price={lead.estimated_value ? `$${lead.estimated_value}` : '--'} 
-                          onClick={() => handleOpenDetail(lead)}
-                          onRetry={(e: React.MouseEvent) => handleRetry(lead, e)} 
-                          onDelete={(e: React.MouseEvent) => handleDelete(lead.id, e)}
-                        />
-                      ))
+                      leads.map((lead) => {
+                        const isOld = new Date().getTime() - new Date(lead.created_at).getTime() > SEVEN_DAYS_MS;
+                        const isLocked = !isPro && isOld;
+                        
+                        return (
+                          <TableRow 
+                            key={lead.id}
+                            isLocked={isLocked}
+                            img={lead.thumbnail_url ? <img src={lead.thumbnail_url} className="w-10 h-10 object-cover rounded-lg" alt="" /> : "📦"} 
+                            name={lead.product_name || '未知产品'} source={lead.source} region={lead.region || 'Global'} status={lead.status} price={lead.estimated_value ? `$${lead.estimated_value}` : '--'} 
+                            onClick={() => handleOpenDetail(lead)}
+                            onRetry={(e: React.MouseEvent) => handleRetry(lead, e)} 
+                            onDelete={(e: React.MouseEvent) => handleDelete(lead.id, e)}
+                          />
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
+                
+                {/* 🌟 核心埋点 4：列表底部的历史锁定焦虑感提示 */}
+                {!isPro && oldLeadsCount > 0 && (
+                  <div className="bg-rose-50 border-t border-rose-100 p-4 text-center mt-auto">
+                    <p className="text-sm text-rose-600 font-bold flex items-center justify-center gap-2">
+                      <Lock size={16} /> ⚠️ 您有 {oldLeadsCount} 条历史报价已锁定（超过 7 天）。
+                      <button onClick={() => setShowPayModal(true)} className="underline hover:text-rose-800 ml-1">升级 Pro 解锁永久数据资产库</button>
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -393,10 +413,13 @@ export default function Dashboard() {
         onSuccess={() => { setIsModalOpen(false); fetchLeads(); if(user) fetchUserProfile(user.id); }} 
         onSelectDemo={(demoData) => { setIsModalOpen(false); setSelectedInquiryId(demoData.id); setDetailData(demoData); }} 
       />
+      
+      {/* 🌟 传入 isPro 基因激活 QuoteDetailPanel 里的模糊逻辑 */}
       <QuoteDetailPanel 
         isOpen={!!selectedInquiryId} 
         onClose={() => { setSelectedInquiryId(null); setDetailData(null); }} 
         quoteData={detailData} 
+        isPro={isPro}
         inquiry={
           leads.find(item => item.id === selectedInquiryId) || 
           (detailData ? { 
@@ -408,6 +431,96 @@ export default function Dashboard() {
         onRetry={handleDetailRetry}
       />
 
+      {/* --- 第5次使用里程碑弹窗 --- */}
+      {showMilestoneModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white max-w-sm rounded-3xl p-8 text-center shadow-2xl relative border border-slate-100 animate-in zoom-in-95">
+            <button onClick={() => setShowMilestoneModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-slate-50 rounded-full p-1"><X size={18}/></button>
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
+              <TrendingUp size={28}/>
+            </div>
+            <h3 className="text-xl font-black text-slate-800 mb-2">您已熟练掌握看图核价！</h3>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">系统检测到您已成功核算 5 款产品。<br/>您不再是个新手了，现在是时候摸清利润底牌，提升 30% 真实成交率了。</p>
+            <button onClick={() => { setShowMilestoneModal(false); setShowPayModal(true); }} className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl shadow-lg shadow-slate-900/20 hover:bg-slate-800 transition-all flex justify-center items-center gap-2">
+              <Crown size={18} className="text-amber-400" /> 升级 Pro 获取对客逼单方案
+            </button>
+            <button onClick={() => setShowMilestoneModal(false)} className="mt-4 text-xs font-medium text-slate-400 hover:text-slate-600">继续使用基础版</button>
+          </div>
+        </div>
+      )}
+
+      {/* --- 🌟 终极高转化率 Paywall 弹窗 (替换掉了原来的咖啡弹窗) --- */}
+      {showPayModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-white max-w-[800px] w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 relative">
+            <button onClick={() => setShowPayModal(false)} className="absolute top-4 right-4 z-10 p-2 bg-white/50 hover:bg-white rounded-full text-slate-400 hover:text-slate-800 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+            
+            {/* 左侧情绪放大区 */}
+            <div className="bg-slate-900 text-white p-8 md:w-5/12 flex flex-col justify-center relative overflow-hidden">
+              <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-600 rounded-full blur-3xl opacity-30"></div>
+              <Crown className="w-12 h-12 text-amber-400 mb-6 relative z-10" />
+              <h2 className="text-2xl font-black mb-4 leading-tight relative z-10">你报错一单亏 $200<br/>开通 Pro 只要 ¥199/月</h2>
+              <p className="text-slate-400 text-sm mb-8 leading-relaxed relative z-10">
+                你不是不会报价，你只是没有老鸟的那套算法。不要再用瞎猜去赌运气了。
+              </p>
+              
+              <div className="space-y-4 relative z-10">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <p className="text-sm"><strong className="text-white block">双引擎防坑算价</strong>毛衫/梭织独立算法，摸清利润底牌</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <TrendingUp className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <p className="text-sm"><strong className="text-white block">独家 A/B 逼单方案</strong>自动生成“高配锚点+跑量成交”策略</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <FileText className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <p className="text-sm"><strong className="text-white block">一键渲染专业 PDF</strong>不再自己排版，让客户秒回邮件</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 右侧强转化区 */}
+            <div className="p-8 md:w-7/12 bg-white flex flex-col justify-center">
+              <div className="text-center mb-6">
+                <h3 className="text-xl font-bold text-slate-800 mb-2">选择您的赚钱装备</h3>
+                <p className="text-sm text-slate-500">买的不是工具，而是少亏钱的概率。</p>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div className="border-2 border-blue-600 bg-blue-50/50 rounded-2xl p-5 relative cursor-pointer shadow-md transform hover:-translate-y-1 transition-all">
+                  <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-bl-lg rounded-tr-xl">搞钱首选</div>
+                  <div className="flex justify-between items-center mb-1">
+                    <h4 className="font-black text-slate-800 text-lg">Pro 专业版 <span className="text-xs font-normal text-slate-500 ml-1">/ 季度</span></h4>
+                    <span className="text-2xl font-black text-blue-600">¥999</span>
+                  </div>
+                  <p className="text-xs text-slate-600">解锁完整底层 BOM 拆解与多阶梯方案，一单回本。</p>
+                </div>
+
+                <div className="border border-slate-200 hover:border-slate-300 rounded-2xl p-5 relative cursor-pointer transition-all opacity-80 hover:opacity-100">
+                  <div className="flex justify-between items-center mb-1">
+                    <h4 className="font-bold text-slate-700 text-base">Starter 入门版 <span className="text-xs font-normal text-slate-500 ml-1">/ 月</span></h4>
+                    <span className="text-xl font-bold text-slate-800">¥199</span>
+                  </div>
+                  <p className="text-xs text-slate-500">无限次核算，获取安全底价区间防坑。</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center mb-4">
+                <p className="text-xs font-bold text-slate-800 mb-2">👇 请扫码添加开发者微信开通</p>
+                <div className="w-32 h-32 bg-white border border-slate-200 mx-auto rounded-lg shadow-sm flex items-center justify-center p-1 mb-2">
+                  <img src="/pay-qr.jpg" alt="WeChat QR" className="w-full h-full object-contain" />
+                </div>
+                <p className="text-[10px] text-slate-500">转账后发送截图，1分钟内人工激活 Pro 权限</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 任务赚算力弹窗 */}
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
@@ -468,6 +581,7 @@ export default function Dashboard() {
         </div>
       )}
       
+      {/* 贡献底价弹窗 */}
       {showUploadQuoteModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden relative">
@@ -529,6 +643,7 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* 新手礼包弹窗 */}
       {showGiftModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
           <div className="bg-white max-w-sm w-full rounded-3xl shadow-2xl p-8 text-center relative overflow-hidden transform transition-all scale-100 animate-in zoom-in-90 border border-slate-100">
@@ -539,47 +654,6 @@ export default function Dashboard() {
               <Sparkles size={18} /> 立即开启我的首单测算
             </button>
             <button onClick={() => { localStorage.setItem('giftClaimed', 'true'); setShowGiftModal(false); }} className="mt-4 text-xs text-slate-400 hover:text-slate-600 font-medium">稍后使用</button>
-          </div>
-        </div>
-      )}
-
-      {showPayModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
-            <button onClick={() => setShowPayModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 z-10"><X size={20} /></button>
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4"><Flame size={28} /></div>
-              <h2 className="text-xl font-bold text-slate-800 mb-2">🚀 免费算力已耗尽，但这只是开始...</h2>
-              <div className="text-sm text-slate-600 text-left space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6">
-                <p>嗨，朋友，我是 QuoteMaster 的独立开发者兼打杂小哥。</p>
-                <p>感谢你用光了 15 次额度！这说明我熬夜敲出来的 AI 引擎真的帮到了你。大模型调用费确实有点贵，服务器已经快冒烟了 😅。</p>
-                <p>如果这个工具帮你省下了时间，留住了客户，<strong className="text-slate-800">恳请你请我喝杯咖啡 (¥199 / 月)</strong>，解锁【Pro 无限火力版】。</p>
-              </div>
-              <div className="bg-slate-900 p-4 rounded-xl flex items-center justify-between text-left mb-6">
-                <div>
-                  <p className="text-white font-bold flex items-center gap-1.5"><Crown size={16} className="text-amber-400"/> Pro 无限火力特权</p>
-                  <ul className="text-slate-400 text-xs mt-1 space-y-0.5">
-                    <li>• 无限制 AI 看图核价</li>
-                    <li>• 解锁隐藏的深度 BOM 明细</li>
-                    <li>• 开发者 1对1 优先支持</li>
-                  </ul>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-black text-white">¥199</p>
-                  <p className="text-[10px] text-slate-400">/ 每月</p>
-                </div>
-              </div>
-              <div className="border-2 border-dashed border-blue-200 bg-blue-50/50 p-4 rounded-xl relative">
-                <p className="text-sm font-bold text-slate-800 mb-2">👇 请扫码支付，并添加我微信</p>
-                <div className="w-40 h-40 bg-white border border-slate-200 mx-auto rounded-lg shadow-sm flex items-center justify-center mb-3 p-1">
-                  <img src="/pay-qr.jpg" alt="开发者收款码" className="w-full h-full object-contain" />
-                </div>
-                <p className="text-[11px] text-slate-500 bg-white p-2 rounded border border-slate-100 shadow-sm">
-                  转账后请添加微信：<strong className="text-slate-800 selection:bg-blue-200">ldbrian</strong> 发送截图<br/>我将在一分钟内为您手动开通权限。
-                </p>
-              </div>
-              <button onClick={() => setShowPayModal(false)} className="mt-4 text-xs font-medium text-slate-400 hover:text-slate-600">暂不升级，我去赚取免费额度</button>
-            </div>
           </div>
         </div>
       )}
@@ -613,16 +687,22 @@ function StatCard({ label, value, trend, trendUp }: any) {
   );
 }
 
-function TableRow({ img, name, source, region, status, price, onClick, onRetry, onDelete }: any) {
+function TableRow({ img, name, source, region, status, price, onClick, onRetry, onDelete, isLocked }: any) {
   const isAnalyzing = status === 'analyzing';
   const isFailed = status === 'failed';
   
   return (
-    <tr onClick={onClick} className={`transition-colors group ${isAnalyzing ? 'cursor-wait opacity-80' : 'hover:bg-slate-50/80 cursor-pointer'}`}>
+    <tr onClick={onClick} className={`transition-colors group ${isAnalyzing ? 'cursor-wait opacity-80' : 'hover:bg-slate-50/80 cursor-pointer'} ${isLocked ? 'opacity-60 bg-slate-50 grayscale' : ''}`}>
       <td className="px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-xl shadow-inner overflow-hidden">{img}</div>
-          <span className="font-semibold text-slate-700 text-sm truncate max-w-[200px]">{name}</span>
+          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-xl shadow-inner overflow-hidden relative">
+            {isLocked && <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[1px] z-10"><Lock size={16} className="text-white"/></div>}
+            {img}
+          </div>
+          <span className="font-semibold text-slate-700 text-sm truncate max-w-[200px] flex items-center gap-2">
+            {name}
+            {isLocked && <Lock size={12} className="text-slate-400 shrink-0"/>}
+          </span>
         </div>
       </td>
       <td className="px-6 py-4 text-sm text-slate-500 hidden sm:table-cell">{source}</td>
@@ -632,12 +712,18 @@ function TableRow({ img, name, source, region, status, price, onClick, onRetry, 
         </span>
       </td>
       <td className="px-6 py-4">
-        <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${(statusMap as any)[status] || 'bg-slate-100 text-slate-500'} flex items-center gap-1`}>
-          {isAnalyzing && <Loader2 size={10} className="animate-spin" />}
-          {statusTextMap[status] || status}
-        </span>
+        {isLocked ? (
+          <span className="inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-slate-200 text-slate-500 flex items-center gap-1">
+            <Lock size={10} /> 已锁定
+          </span>
+        ) : (
+          <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${(statusMap as any)[status] || 'bg-slate-100 text-slate-500'} flex items-center gap-1`}>
+            {isAnalyzing && <Loader2 size={10} className="animate-spin" />}
+            {statusTextMap[status] || status}
+          </span>
+        )}
       </td>
-      <td className="px-6 py-4 text-sm font-bold text-slate-900">{price}</td>
+      <td className="px-6 py-4 text-sm font-bold text-slate-900">{isLocked ? '***' : price}</td>
       <td className="px-6 py-4 text-right">
         <div className="flex items-center justify-end gap-3">
           {isFailed ? (
