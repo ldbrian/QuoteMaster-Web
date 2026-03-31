@@ -79,31 +79,6 @@ export default function Dashboard() {
     }
   }, [leads, selectedInquiryId, detailData]);
 
-  useEffect(() => {
-  // 🌟 开启实时监听：订阅 inquiries 表的更新
-  const channel = supabase
-    .channel('schema-db-changes')
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE', // 监听更新动作
-        schema: 'public',
-        table: 'inquiries'
-      },
-      (payload) => {
-        console.log('检测到数据更新!', payload);
-        // 核心动作：当收到更新（Worker 完成处理）时，触发页面数据刷新
-        fetchLeads(); // 刷新左侧的列表状态
-          if (user) fetchUserProfile(user.id);
-      }
-    )
-    .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel); // 销毁组件时取消订阅
-    };
-  }, []);
-
   const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
@@ -119,6 +94,45 @@ export default function Dashboard() {
     }
   };
 
+  const fetchLeads = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('inquiries').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      setLeads(data || []);
+    } catch (error) {
+      console.error("获取线索失败：", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🌟 终极实时监听：自动刷新列表与算力余额 (已完美解决闭包和重复绑定问题)
+  useEffect(() => {
+    if (!user) return; // 必须等 user 获取到才挂载监听
+
+    const channel = supabase
+      .channel('master-realtime-channel')
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', // 监听任何增删改
+          schema: 'public', 
+          table: 'inquiries' 
+        },
+        (payload) => {
+          console.log('⚡ 接收到 Worker 捷报，触发 UI 无感刷新!', payload);
+          fetchLeads(); // 刷新左侧的核价记录列表
+          fetchUserProfile(user.id); // 刷新右上角的算力余额
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]); // 依赖项绑死 user
+
   const handleClaimGift = () => {
     localStorage.setItem('giftClaimed', 'true');
     setShowGiftModal(false);
@@ -132,18 +146,6 @@ export default function Dashboard() {
     } else {
       trackEvent('click_new_quote', {}, user?.id);
       setIsModalOpen(true); 
-    }
-  };
-
-  const fetchLeads = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('inquiries').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      setLeads(data || []);
-    } catch (error) {
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -167,7 +169,6 @@ export default function Dashboard() {
       }).eq('id', lead.id);
 
       if (error) throw error;
-      // 🚫 删除了前端自己扣费的代码，保障系统安全！
     } catch (error) {
       console.error("重试失败：", error);
       alert("错误已打印在控制台，请按 F12 查看！");
@@ -207,23 +208,12 @@ export default function Dashboard() {
       }).eq('id', selectedInquiryId);
 
       if (error) throw error; 
-      // 🚫 删除了前端自己扣费的代码！
-
     } catch (error) {
       console.error("重算失败：", error);
       alert("错误已打印在浏览器控制台，请按 F12 查看！");
       fetchLeads();
     }
   };
-
-  // 监听数据库实时变动，当 Worker 扣费或改状态时，自动刷新 UI
-  useEffect(() => {
-    const channel = supabase.channel('realtime-inquiries').on('postgres_changes', { event: '*', schema: 'public', table: 'inquiries' }, (payload) => {
-      fetchLeads(); 
-      if(user) fetchUserProfile(user.id); // Worker 扣完费，这里会自动拉取最新余额！
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user]);
 
   const kpiData = useMemo(() => {
     const totalValue = leads.reduce((sum, lead) => sum + (Number(lead.estimated_value) || 0), 0);
