@@ -158,7 +158,7 @@ export default function LandingPage() {
               <div className="absolute -top-4 -right-4 bg-amber-500 text-slate-900 font-black px-4 py-1.5 rounded-full shadow-lg transform rotate-12 text-sm">
                 内部真实界面演示
               </div>
-              <img src="/demo-interface.jpg" alt="QuoteMaster 界面演示" className="rounded-xl border border-slate-600 shadow-inner bg-slate-900 w-full h-auto object-cover min-h-[300px] fallback-bg" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+              <img src="/demo-interface.png" alt="QuoteMaster 界面演示" className="rounded-xl border border-slate-600 shadow-inner bg-slate-900 w-full h-auto object-cover min-h-[300px] fallback-bg" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
               <div className="hidden absolute inset-0 m-6 rounded-xl border-2 border-dashed border-slate-600 flex flex-col items-center justify-center text-slate-500">
                 <Lock size={32} className="mb-2 opacity-50" />
                 <span className="font-bold text-sm">登录工作台后查看极速解析引擎</span>
