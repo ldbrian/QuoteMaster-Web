@@ -93,8 +93,8 @@ export default function Dashboard() {
       (payload) => {
         console.log('检测到数据更新!', payload);
         // 核心动作：当收到更新（Worker 完成处理）时，触发页面数据刷新
-        // 如果你使用的是 Next.js，可以调用 router.refresh() 
-        // 或者重新执行获取列表的函数 fetchInquiries()
+        fetchLeads(); // 刷新左侧的列表状态
+          if (user) fetchUserProfile(user.id);
       }
     )
     .subscribe();
