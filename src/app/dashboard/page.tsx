@@ -79,6 +79,31 @@ export default function Dashboard() {
     }
   }, [leads, selectedInquiryId, detailData]);
 
+  useEffect(() => {
+  // 🌟 开启实时监听：订阅 inquiries 表的更新
+  const channel = supabase
+    .channel('schema-db-changes')
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE', // 监听更新动作
+        schema: 'public',
+        table: 'inquiries'
+      },
+      (payload) => {
+        console.log('检测到数据更新!', payload);
+        // 核心动作：当收到更新（Worker 完成处理）时，触发页面数据刷新
+        // 如果你使用的是 Next.js，可以调用 router.refresh() 
+        // 或者重新执行获取列表的函数 fetchInquiries()
+      }
+    )
+    .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel); // 销毁组件时取消订阅
+    };
+  }, []);
+
   const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
