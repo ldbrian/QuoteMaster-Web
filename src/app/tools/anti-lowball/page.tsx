@@ -67,7 +67,9 @@ export default function AntiLowballTool() {
                 <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 font-medium">$</span>
                 <input 
                   type="number" 
-                  className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-900 font-bold"
+                  min="0" 
+                  step="0.01"
+                  className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-900 font-bold placeholder-slate-300"
                   placeholder="15.00"
                   value={originalPrice}
                   onChange={(e) => setOriginalPrice(e.target.value)}
@@ -80,7 +82,9 @@ export default function AntiLowballTool() {
                 <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 font-medium">$</span>
                 <input 
                   type="number" 
-                  className="w-full pl-8 pr-4 py-3 bg-red-50 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all text-red-900 font-bold"
+                  min="0" 
+                  step="0.01"
+                  className="w-full pl-8 pr-4 py-3 bg-red-50 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all text-red-900 font-bold placeholder-red-300"
                   placeholder="9.50"
                   value={targetPrice}
                   onChange={(e) => setTargetPrice(e.target.value)}
