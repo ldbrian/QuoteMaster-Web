@@ -23,29 +23,48 @@ export default function AntiLowballTool() {
     }
 
     const dropPercent = ((orig - target) / orig) * 100;
+    const diff = (orig - target).toFixed(2); // 算出具体砍了多少钱
     
+    // 动态提取类目名称和核心成本项，增加专业感
+    const catMap: Record<string, { name: string, driver: string }> = {
+      'woven': { name: '梭织服装', driver: '面料排版损耗' },
+      'knit': { name: '针织/毛织', driver: '纱线损耗与克重' },
+      'bags': { name: '箱包配件', driver: '五金件与开模费' }
+    };
+    const catInfo = catMap[category] || catMap['woven'];
+
     let riskLevel = 'LOW';
     let title = '';
     let message = '';
     let showEasterEgg = false;
+    let easterEggText = '';
 
-    // 核心判定逻辑
+    // 彩蛋盲盒库
+    const easterEggs = [
+      `“该客户的报价已突破碳基生物的底线。建议直接回复：Dear Sir, 拿着 $${target} 的预算，我们只能为您提供该款式的高清打印照片。如需现货，建议左转下载 Temu。”`,
+      `“建议回复：尊敬的客户，单件直接砍掉 $${diff} 是个天才的想法。我们接受这个报价，但只能发给您一堆${catInfo.name}的边角料，请您自己用胶水粘起来。”`,
+      `“建议回复：Dear Sir, 看到您 $${target} 的目标价，我们车间的缝纫机连夜扛着火车跑了。建议您带着这个预算去义乌小商品市场按斤批发。”`
+    ];
+
     if (dropPercent > 30) {
       riskLevel = 'CRITICAL';
       title = `⚡️ 严重警告：跌幅 ${dropPercent.toFixed(1)}%！`;
-      message = "已彻底击穿长三角/珠三角常规加工费底线！强行接单意味着你在倒贴人工和场地费。建议立刻叫停该订单的常规推进。";
-      showEasterEgg = true; // 触发掀桌子彩蛋
+      // 动态拼接文案
+      message = `单件直接被砍掉 $${diff}！这个跌幅已经彻底击穿江浙沪${catInfo.name}的常规加工费底线！强行接单意味着你在倒贴人工和场地费。`;
+      showEasterEgg = true;
+      // 随机抽取一个彩蛋
+      easterEggText = easterEggs[Math.floor(Math.random() * easterEggs.length)];
     } else if (dropPercent > 15) {
       riskLevel = 'HIGH';
       title = `⚠️ 高风险：跌幅 ${dropPercent.toFixed(1)}%`;
-      message = "利润空间被严重挤压！按原版工艺做大概率白忙一场。必须立刻重新核算排料损耗，并向老外提供【降维减配版】方案。";
+      message = `单件想抠出 $${diff} 的利润，空间已被严重挤压！按原版工艺做${catInfo.name}大概率白忙一场。必须立刻重新核算${catInfo.driver}，并向老外提供【降维减配版】方案。`;
     } else {
       riskLevel = 'MEDIUM';
       title = `💡 处于博弈区间：跌幅 ${dropPercent.toFixed(1)}%`;
-      message = "属于老外常规的试探性砍价。建议通过微调起订量（MOQ）、交期或付款方式来换取不降价，切勿轻易让步。";
+      message = `老外想少付 $${diff}，这属于常规的试探性砍价。建议通过微调起订量（MOQ）或交期来换取不降价，切勿轻易让步。`;
     }
 
-    setResult({ riskLevel, dropPercent, title, message, showEasterEgg });
+    setResult({ riskLevel, dropPercent, title, message, showEasterEgg, easterEggText });
   };
 
   return (
