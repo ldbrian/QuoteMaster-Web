@@ -162,8 +162,9 @@ export default function AntiLowballTool() {
                 <h4 className="text-emerald-400 font-bold text-sm mb-2 flex items-center">
                   <span className="mr-2">💡</span> 情绪释放专区 (倒反天罡版回复)
                 </h4>
+                {/* 这里渲染动态文案 */}
                 <p className="text-slate-300 text-sm italic leading-relaxed relative z-10 font-medium">
-                  “该客户的报价已突破碳基生物的底线。建议直接回复：Dear Sir, 按照您的预算，我们只能为您提供该款式的高清打印照片。如需现货，建议左转下载 Temu。”
+                  {result.easterEggText}
                 </p>
               </div>
             )}
