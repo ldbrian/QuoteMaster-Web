@@ -187,6 +187,14 @@ export default function AntiLowballTool() {
         )}
 
       </div>
+      {/* 真诚免责声明 */}
+            <div className="mt-6 text-center pb-4">
+              <p className="text-xs text-slate-400 font-medium">
+                💡 开发者免责声明：本工具为失业 UX 设计师手搓的“快速避坑与情绪发泄”插件。<br/>
+                测算结果基于行业常规数据预估，不作为最终商业决策依据。<br/>
+                如需根据您的实际款式进行精准核价，请务必使用 QuoteMaster AI 主引擎。
+              </p>
+            </div>
     </div>
   );
 }
