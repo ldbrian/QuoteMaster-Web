@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  X, BotMessageSquare, Loader2, BarChart3, TrendingUp, 
-  FileText, Calculator, RefreshCw, Copy, CheckCheck, Edit3, Save, MessageCircle, Tag, Send, Crown,
+  X, BotMessageSquare, Loader2, BarChart3, TrendingUp, Tag, 
+  FileText, Calculator, RefreshCw, Copy, CheckCheck, Edit3, Save, MessageCircle, Send, Crown,
   Lock, AlertTriangle, ShieldCheck, Clock, ShieldAlert, ChevronDown, ChevronUp
 } from 'lucide-react'; 
 import { supabase } from '@/src/utils/supabase/client'; 
@@ -27,7 +27,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
   const [exchangeRate, setExchangeRate] = useState<number>(6.0); 
   const [moq, setMoq] = useState<number>(500); 
   const [markup, setMarkup] = useState<number>(1.13); 
-  const [styleNo, setStyleNo] = useState<string>(''); // 新增：款号
+  const [styleNo, setStyleNo] = useState<string>(''); 
 
   // 🌟 智能折叠状态
   const [isWarningsOpen, setIsWarningsOpen] = useState(false);
@@ -42,6 +42,17 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
   const [showExportModal, setShowExportModal] = useState(false);
   const [showProPaywall, setShowProPaywall] = useState(false);
 
+  // 🛡️ 终极防呆装甲：绝对安全的成本核算逻辑，专治 AI 乱写数据导致系统崩溃
+  const getSafeCost = (plan: any) => {
+    if (plan?.cost_range && Array.isArray(plan.cost_range) && plan.cost_range.length === 2) {
+      return Number(plan.cost_range[1]) || 0;
+    }
+    if (plan?.bom && Array.isArray(plan.bom)) {
+      return plan.bom.reduce((sum: number, item: any) => sum + (Number(item.cost) || 0), 0);
+    }
+    return 0;
+  };
+
   useEffect(() => {
     if (quoteData) {
       const cloned = JSON.parse(JSON.stringify(quoteData));
@@ -55,15 +66,12 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
     }
   }, [quoteData]);
 
-  // 老鸟公式联动引擎
   useEffect(() => {
     if (!localQuote?.plans || !activeTab) return;
     const updated = { ...localQuote };
     const plan = updated.plans[activeTab];
     
-    const costRange = plan.cost_range || [];
-    const safeCost = costRange.length === 2 ? costRange[1] : (plan.bom?.reduce((sum: number, item: any) => sum + (Number(item.cost) || 0), 0) || 0);
-    
+    const safeCost = getSafeCost(plan);
     const totalSafeCost = safeCost + (2 / exchangeRate); 
     const newFob = totalSafeCost * markup;
     
@@ -100,7 +108,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
     const newFob = parseFloat(newFobStr) || 0;
     plan.final_price = newFob;
     
-    const safeCost = (plan.cost_range && plan.cost_range.length === 2) ? plan.cost_range[1] : (plan.bom?.reduce((sum: number, item: any) => sum + (Number(item.cost) || 0), 0) || 0);
+    const safeCost = getSafeCost(plan);
     const totalSafeCost = safeCost + (2 / exchangeRate);
     plan.margin = newFob > 0 ? (newFob - totalSafeCost) / newFob : 0;
     setLocalQuote(updated);
@@ -111,7 +119,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
     const updated = { ...localQuote };
     const plan = updated.plans[activeTab];
     
-    const safeCost = (plan.cost_range && plan.cost_range.length === 2) ? plan.cost_range[1] : (plan.bom?.reduce((sum: number, item: any) => sum + (Number(item.cost) || 0), 0) || 0);
+    const safeCost = getSafeCost(plan);
     const totalSafeCost = safeCost + (2 / exchangeRate);
     const newFob = totalSafeCost / (1 - (marginPercent / 100));
     
@@ -154,7 +162,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
     return {
       ...localQuote,
       product_name: `${localQuote.product_name} - ${plan.name || activeTab.toUpperCase()}`,
-      style_no: styleNo, // 导出时包含款号
+      style_no: styleNo, 
       bom: plan.bom,
       margin: (plan.margin * plan.final_price) || 0,
       final_price: plan.final_price,
@@ -167,7 +175,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
       <div className={`fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm transition-opacity duration-300 p-2 md:p-4 lg:p-8`}>
         <div className={`bg-slate-50 w-full max-w-[95vw] xl:max-w-[85vw] h-[98vh] md:h-[95vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200`}>
           
-          {/* 顶栏：轻量化标题与操作区 */}
           <div className="px-5 py-3 border-b border-slate-200 flex justify-between items-center bg-white shrink-0 z-10 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shadow-sm">
@@ -204,7 +211,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
               </div>
             ) : (
               <>
-                {/* ⬅️ 左侧栏：上下文与控制台 (280px - 320px) */}
                 <div className="w-full lg:w-[300px] xl:w-[320px] bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto p-5 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
                   <div className="aspect-square w-full rounded-xl overflow-hidden border border-slate-100 bg-slate-50 mb-4 shadow-inner relative group">
                     {inquiry?.thumbnail_url ? (
@@ -255,7 +261,8 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                     {(() => {
                       const currentPlan = localQuote.plans[activeTab];
                       if (!currentPlan) return null;
-                      const safeCost = (currentPlan.cost_range && currentPlan.cost_range.length === 2) ? currentPlan.cost_range[1] : (currentPlan.bom?.reduce((sum: number, item: any) => sum + (Number(item.cost) || 0), 0) || 0);
+                      
+                      const safeCost = getSafeCost(currentPlan);
                       const totalSafeCost = safeCost + (2 / exchangeRate);
                       const finalPriceValue = currentPlan.final_price || (totalSafeCost * markup); 
                       const marginValue = currentPlan.margin !== undefined ? currentPlan.margin : ((finalPriceValue - totalSafeCost) / finalPriceValue);
@@ -273,11 +280,9 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                   </div>
                 </div>
 
-                {/* ➡️ 右侧流：对客结果与智能折叠区 */}
                 <div className="flex-1 flex flex-col min-w-0">
                   <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
                     
-                    {/* A/B 方案全局切换 */}
                     {availablePlans.length > 1 && (
                       <div className="flex p-1 bg-white rounded-xl shadow-sm border border-slate-200 inline-flex">
                         {availablePlans.map((key) => (
@@ -306,8 +311,8 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                       if (!currentPlan) return null;
 
                       const costRange = currentPlan.cost_range || [];
-                      const hasRange = costRange.length === 2;
-                      const safeCost = hasRange ? costRange[1] : (currentPlan.bom?.reduce((sum: number, item: any) => sum + (Number(item.cost) || 0), 0) || 0);
+                      const hasRange = Array.isArray(costRange) && costRange.length === 2;
+                      const safeCost = getSafeCost(currentPlan);
                       const totalSafeCost = safeCost + (2 / exchangeRate);
                       const finalPriceValue = currentPlan.final_price || (totalSafeCost * markup); 
                       const realCnyValue = (finalPriceValue * 7.2).toFixed(2);
@@ -315,7 +320,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                       return (
                         <div className="space-y-6 max-w-4xl animate-in slide-in-from-bottom-2 duration-300">
                           
-                          {/* 1. 价格底盘 (最显眼) */}
                           <div className="flex flex-col sm:flex-row gap-4">
                             <div className="flex-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
                                 {localQuote?.confidence_level && (
@@ -344,7 +348,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                             </div>
                           </div>
 
-                          {/* 2. 交期预测 & 快语 (行动核心) */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="md:col-span-1 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
                               <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-1.5"><Clock className="w-4 h-4 text-indigo-500" /> 交期估算 (ETA)</p>
@@ -377,7 +380,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                             </div>
                           </div>
 
-                          {/* 3. 智能折叠区：工艺预警 */}
                           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300">
                             <button 
                               onClick={() => setIsWarningsOpen(!isWarningsOpen)}
@@ -403,7 +405,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                             )}
                           </div>
 
-                          {/* 4. 智能折叠区：底层 BOM 表 */}
                           <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 relative ${!isPro ? 'pb-16' : ''}`}>
                             <button 
                               onClick={() => setIsBomOpen(!isBomOpen)}
@@ -460,7 +461,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                             )}
                           </div>
                           
-                          {/* 占位，防止底部按钮挡住内容 */}
                           <div className="h-20"></div>
 
                         </div>
@@ -468,7 +468,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                     })()}
                   </div>
 
-                  {/* 底部悬浮操作区 */}
                   <div className="border-t border-slate-200 bg-white/80 backdrop-blur-md p-4 shrink-0 flex items-center justify-between gap-4 z-20 sticky bottom-0">
                     <button onClick={handleSaveChanges} disabled={isSaving} className="px-5 py-2.5 bg-slate-100 text-slate-600 font-bold rounded-xl text-sm hover:bg-slate-200 transition-colors flex items-center gap-2">
                       {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} <span className="hidden sm:inline">保存</span>
