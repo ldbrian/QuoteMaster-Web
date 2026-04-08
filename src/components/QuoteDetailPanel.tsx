@@ -42,12 +42,13 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
   const [showExportModal, setShowExportModal] = useState(false);
   const [showProPaywall, setShowProPaywall] = useState(false);
 
-  // 🛡️ 终极防呆装甲：绝对安全的成本核算逻辑，专治 AI 乱写数据导致系统崩溃
+  // 🛡️ 终极防呆装甲
   const getSafeCost = (plan: any) => {
-    if (plan?.cost_range && Array.isArray(plan.cost_range) && plan.cost_range.length === 2) {
+    if (!plan) return 0;
+    if (plan.cost_range && Array.isArray(plan.cost_range) && plan.cost_range.length === 2) {
       return Number(plan.cost_range[1]) || 0;
     }
-    if (plan?.bom && Array.isArray(plan.bom)) {
+    if (plan.bom && Array.isArray(plan.bom)) {
       return plan.bom.reduce((sum: number, item: any) => sum + (Number(item.cost) || 0), 0);
     }
     return 0;
@@ -66,10 +67,12 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
     }
   }, [quoteData]);
 
+  // 老鸟公式联动引擎
   useEffect(() => {
     if (!localQuote?.plans || !activeTab) return;
     const updated = { ...localQuote };
-    const plan = updated.plans[activeTab];
+    const plan = updated.plans?.[activeTab];
+    if (!plan) return; 
     
     const safeCost = getSafeCost(plan);
     const totalSafeCost = safeCost + (2 / exchangeRate); 
@@ -104,7 +107,9 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
   const handleFobChange = (newFobStr: string) => {
     if (!localQuote?.plans || !activeTab) return;
     const updated = { ...localQuote };
-    const plan = updated.plans[activeTab];
+    const plan = updated.plans?.[activeTab];
+    if (!plan) return;
+
     const newFob = parseFloat(newFobStr) || 0;
     plan.final_price = newFob;
     
@@ -117,7 +122,8 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
   const handleMarginSliderChange = (marginPercent: number) => {
     if (!localQuote?.plans || !activeTab) return;
     const updated = { ...localQuote };
-    const plan = updated.plans[activeTab];
+    const plan = updated.plans?.[activeTab];
+    if (!plan) return;
     
     const safeCost = getSafeCost(plan);
     const totalSafeCost = safeCost + (2 / exchangeRate);
@@ -158,14 +164,14 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
 
   const getExportData = () => {
     if (!localQuote?.plans || !activeTab) return localQuote;
-    const plan = localQuote.plans[activeTab];
+    const plan = localQuote.plans?.[activeTab];
     return {
       ...localQuote,
-      product_name: `${localQuote.product_name} - ${plan.name || activeTab.toUpperCase()}`,
+      product_name: `${localQuote.product_name} - ${plan?.name || activeTab.toUpperCase()}`,
       style_no: styleNo, 
-      bom: plan.bom,
-      margin: (plan.margin * plan.final_price) || 0,
-      final_price: plan.final_price,
+      bom: plan?.bom || [],
+      margin: (plan?.margin * plan?.final_price) || 0,
+      final_price: plan?.final_price || 0,
       moq: moq 
     };
   };
@@ -211,6 +217,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
               </div>
             ) : (
               <>
+                {/* 左侧栏：上下文与控制台 */}
                 <div className="w-full lg:w-[300px] xl:w-[320px] bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto p-5 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
                   <div className="aspect-square w-full rounded-xl overflow-hidden border border-slate-100 bg-slate-50 mb-4 shadow-inner relative group">
                     {inquiry?.thumbnail_url ? (
@@ -259,7 +266,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                     </div>
 
                     {(() => {
-                      const currentPlan = localQuote.plans[activeTab];
+                      const currentPlan = localQuote?.plans?.[activeTab];
                       if (!currentPlan) return null;
                       
                       const safeCost = getSafeCost(currentPlan);
@@ -280,214 +287,228 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                   </div>
                 </div>
 
+                {/* 右侧流：对客结果与智能折叠区 */}
                 <div className="flex-1 flex flex-col min-w-0">
                   <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
                     
-                    {availablePlans.length > 1 && (
-                      <div className="flex p-1 bg-white rounded-xl shadow-sm border border-slate-200 inline-flex">
-                        {availablePlans.map((key) => (
-                          <button
-                            key={key}
-                            onClick={() => setActiveTab(key)}
-                            className={`flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg transition-all ${
-                              activeTab === key ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                            }`}
-                          >
-                            {localQuote.plans[key].name || key.toUpperCase()}
-                          </button>
-                        ))}
-                        {!isPro && availablePlans.includes('plan_b') && activeTab !== 'plan_b' && (
-                          <div className="absolute right-0 top-0 bottom-0 flex items-center pointer-events-none pr-3">
-                            <span className="flex items-center gap-1 text-[10px] font-black bg-amber-400 text-amber-900 px-2 py-0.5 rounded-full shadow-sm animate-pulse">
-                              <Lock className="w-3 h-3" /> 解锁
-                            </span>
+                    {/* 唯一的数据判断入口 */}
+                    {!localQuote?.plans || availablePlans.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center bg-white border border-slate-200 border-dashed rounded-2xl p-10 text-center h-full shadow-sm">
+                        <BarChart3 className="w-12 h-12 text-slate-300 mb-4" />
+                        <h4 className="text-lg text-slate-700 font-bold mb-2">无结构化方案数据</h4>
+                        <p className="text-sm text-slate-500 max-w-md">历史脏数据或 AI 发生幻觉导致缺失关键字段。<br/>请点击左上角“修正指令”，随便发一句话唤醒最新版引擎重算即可恢复。</p>
+                      </div>
+                    ) : (
+                      <>
+                        {availablePlans.length > 1 && (
+                          <div className="flex p-1 bg-white rounded-xl shadow-sm border border-slate-200 inline-flex">
+                            {availablePlans.map((key) => (
+                              <button
+                                key={key}
+                                onClick={() => setActiveTab(key)}
+                                className={`flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg transition-all ${
+                                  activeTab === key ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                                }`}
+                              >
+                                {localQuote.plans[key]?.name || key.toUpperCase()}
+                              </button>
+                            ))}
+                            {!isPro && availablePlans.includes('plan_b') && activeTab !== 'plan_b' && (
+                              <div className="absolute right-0 top-0 bottom-0 flex items-center pointer-events-none pr-3">
+                                <span className="flex items-center gap-1 text-[10px] font-black bg-amber-400 text-amber-900 px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                                  <Lock className="w-3 h-3" /> 解锁
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
-                      </div>
-                    )}
 
-                    {(() => {
-                      const currentPlan = localQuote.plans[activeTab];
-                      if (!currentPlan) return null;
+                        {(() => {
+                          const currentPlan = localQuote?.plans?.[activeTab];
+                          if (!currentPlan) return null;
 
-                      const costRange = currentPlan.cost_range || [];
-                      const hasRange = Array.isArray(costRange) && costRange.length === 2;
-                      const safeCost = getSafeCost(currentPlan);
-                      const totalSafeCost = safeCost + (2 / exchangeRate);
-                      const finalPriceValue = currentPlan.final_price || (totalSafeCost * markup); 
-                      const realCnyValue = (finalPriceValue * 7.2).toFixed(2);
+                          const costRange = currentPlan.cost_range || [];
+                          const hasRange = Array.isArray(costRange) && costRange.length === 2;
+                          const safeCost = getSafeCost(currentPlan);
+                          const totalSafeCost = safeCost + (2 / exchangeRate);
+                          const finalPriceValue = currentPlan.final_price || (totalSafeCost * markup); 
+                          const realCnyValue = (finalPriceValue * 7.2).toFixed(2);
 
-                      return (
-                        <div className="space-y-6 max-w-4xl animate-in slide-in-from-bottom-2 duration-300">
-                          
-                          <div className="flex flex-col sm:flex-row gap-4">
-                            <div className="flex-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                                {localQuote?.confidence_level && (
-                                  <div className={`absolute top-0 right-0 px-3 py-1 text-[10px] font-black text-white rounded-bl-lg shadow-sm
-                                    ${localQuote.confidence_level === '高' ? 'bg-emerald-500' : localQuote.confidence_level === '中' ? 'bg-amber-500' : 'bg-rose-500'}`}>
-                                    系统置信度: {localQuote.confidence_level}
+                          return (
+                            <div className="space-y-6 max-w-4xl animate-in slide-in-from-bottom-2 duration-300">
+                              
+                              <div className="flex flex-col sm:flex-row gap-4">
+                                <div className="flex-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                                    {localQuote?.confidence_level && (
+                                      <div className={`absolute top-0 right-0 px-3 py-1 text-[10px] font-black text-white rounded-bl-lg shadow-sm
+                                        ${localQuote.confidence_level === '高' ? 'bg-emerald-500' : localQuote.confidence_level === '中' ? 'bg-amber-500' : 'bg-rose-500'}`}>
+                                        系统置信度: {localQuote.confidence_level}
+                                      </div>
+                                    )}
+                                    <p className="text-xs font-bold text-slate-400 mb-1">AI 预估底价区间 (USD)</p>
+                                    <div className="flex items-baseline gap-2 text-3xl font-black text-slate-800">
+                                      {hasRange ? `$${costRange[0].toFixed(2)} - ${costRange[1].toFixed(2)}` : `$${safeCost.toFixed(2)}`}
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-2 truncate group-hover:whitespace-normal group-hover:text-clip transition-all">
+                                      {localQuote?.disclaimer || '基于行业基准估算，实际请与工厂确认'}
+                                    </p>
+                                </div>
+
+                                <div className="flex-1 bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg relative group">
+                                    <p className="text-xs font-bold text-slate-400 mb-1 flex items-center justify-between">
+                                      自定义对客报价 (FOB) <Edit3 className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity text-white" />
+                                    </p>
+                                    <div className="flex items-center text-4xl font-black text-emerald-400">
+                                      $<input type="number" value={finalPriceValue.toFixed(2)} onChange={(e) => handleFobChange(e.target.value)} className="bg-transparent w-full outline-none focus:ring-2 focus:ring-emerald-500 rounded px-1 transition-all text-white" />
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-2 font-mono">核算人民币收益 ≈ <span className="text-white font-bold">¥{realCnyValue}</span></p>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="md:col-span-1 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                                  <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-1.5"><Clock className="w-4 h-4 text-indigo-500" /> 交期估算 (ETA)</p>
+                                  <div className="space-y-3">
+                                    <div>
+                                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">打样 Sample</p>
+                                      <p className="text-sm font-black text-slate-800">{localQuote?.eta_forecast?.sample_time || '5-7 Days'}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">大货 Production</p>
+                                      <p className="text-sm font-black text-slate-800">{localQuote?.eta_forecast?.production_time || '15-25 Days'}</p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="md:col-span-2 bg-blue-50/50 p-5 rounded-2xl border border-blue-100 relative group flex flex-col">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <p className="text-xs font-black text-blue-800 flex items-center gap-1.5 uppercase tracking-wide">
+                                      <MessageCircle className="w-4 h-4"/> WhatsApp 应急稳单快语
+                                    </p>
+                                    <button onClick={() => handleCopy(localQuote?.whatsapp_script || '', 'client')} className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 bg-white text-blue-600 border border-blue-200 rounded shadow-sm hover:bg-blue-600 hover:text-white transition-colors">
+                                      {isCopiedClient ? <><CheckCheck className="w-3 h-3" /> 已复制</> : <><Copy className="w-3 h-3" /> 复制发送</>}
+                                    </button>
+                                  </div>
+                                  <div className="flex-1 bg-white rounded-xl border border-blue-50 p-4 shadow-sm">
+                                    <p className="text-sm text-slate-700 font-mono leading-relaxed whitespace-pre-wrap selection:bg-blue-200">
+                                      {localQuote?.whatsapp_script || 'Waiting for AI generation...'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300">
+                                <button 
+                                  onClick={() => setIsWarningsOpen(!isWarningsOpen)}
+                                  className="w-full px-6 py-4 flex items-center justify-between bg-slate-50 hover:bg-slate-100 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <ShieldAlert className={`w-5 h-5 ${isWarningsOpen ? 'text-amber-600' : 'text-slate-400'}`} />
+                                    <span className={`font-bold text-sm ${isWarningsOpen ? 'text-slate-800' : 'text-slate-600'}`}>打样防翻车工艺预警 (发给工厂)</span>
+                                    {!isWarningsOpen && <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-black rounded-full">⚠️ 存在风险</span>}
+                                  </div>
+                                  {isWarningsOpen ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                                </button>
+                                
+                                {isWarningsOpen && (
+                                  <div className="p-6 border-t border-slate-100 bg-amber-50/30 relative animate-in slide-in-from-top-2 duration-200">
+                                    <p className="text-sm text-amber-900/80 leading-relaxed whitespace-pre-wrap pr-12">
+                                      {localQuote?.factory_warnings || '未检测到明显工艺风险。'}
+                                    </p>
+                                    <button onClick={() => handleCopy(localQuote?.factory_warnings || '', 'factory')} className="absolute top-6 right-6 p-2 bg-white rounded-md shadow-sm border border-amber-200 text-amber-600 hover:bg-amber-600 hover:text-white transition-colors">
+                                      {isCopiedFactory ? <CheckCheck className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                    </button>
                                   </div>
                                 )}
-                                <p className="text-xs font-bold text-slate-400 mb-1">AI 预估底价区间 (USD)</p>
-                                <div className="flex items-baseline gap-2 text-3xl font-black text-slate-800">
-                                  {hasRange ? `$${costRange[0].toFixed(2)} - ${costRange[1].toFixed(2)}` : `$${safeCost.toFixed(2)}`}
-                                </div>
-                                <p className="text-[10px] text-slate-400 mt-2 truncate group-hover:whitespace-normal group-hover:text-clip transition-all">
-                                  {localQuote?.disclaimer || '基于行业基准估算，实际请与工厂确认'}
-                                </p>
-                            </div>
-
-                            <div className="flex-1 bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg relative group">
-                                <p className="text-xs font-bold text-slate-400 mb-1 flex items-center justify-between">
-                                  自定义对客报价 (FOB) <Edit3 className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity text-white" />
-                                </p>
-                                <div className="flex items-center text-4xl font-black text-emerald-400">
-                                  $<input type="number" value={finalPriceValue.toFixed(2)} onChange={(e) => handleFobChange(e.target.value)} className="bg-transparent w-full outline-none focus:ring-2 focus:ring-emerald-500 rounded px-1 transition-all text-white" />
-                                </div>
-                                <p className="text-xs text-slate-400 mt-2 font-mono">核算人民币收益 ≈ <span className="text-white font-bold">¥{realCnyValue}</span></p>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="md:col-span-1 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-                              <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-1.5"><Clock className="w-4 h-4 text-indigo-500" /> 交期估算 (ETA)</p>
-                              <div className="space-y-3">
-                                <div>
-                                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">打样 Sample</p>
-                                  <p className="text-sm font-black text-slate-800">{localQuote?.eta_forecast?.sample_time || '5-7 Days'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">大货 Production</p>
-                                  <p className="text-sm font-black text-slate-800">{localQuote?.eta_forecast?.production_time || '15-25 Days'}</p>
-                                </div>
                               </div>
-                            </div>
 
-                            <div className="md:col-span-2 bg-blue-50/50 p-5 rounded-2xl border border-blue-100 relative group flex flex-col">
-                              <div className="flex items-center justify-between mb-2">
-                                <p className="text-xs font-black text-blue-800 flex items-center gap-1.5 uppercase tracking-wide">
-                                  <MessageCircle className="w-4 h-4"/> WhatsApp 应急稳单快语
-                                </p>
-                                <button onClick={() => handleCopy(localQuote?.whatsapp_script || '', 'client')} className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 bg-white text-blue-600 border border-blue-200 rounded shadow-sm hover:bg-blue-600 hover:text-white transition-colors">
-                                  {isCopiedClient ? <><CheckCheck className="w-3 h-3" /> 已复制</> : <><Copy className="w-3 h-3" /> 复制发送</>}
+                              <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 relative ${!isPro ? 'pb-16' : ''}`}>
+                                <button 
+                                  onClick={() => setIsBomOpen(!isBomOpen)}
+                                  className="w-full px-6 py-4 flex items-center justify-between bg-slate-50 hover:bg-slate-100 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <BarChart3 className={`w-5 h-5 ${isBomOpen ? 'text-slate-800' : 'text-slate-400'}`} />
+                                    <span className={`font-bold text-sm ${isBomOpen ? 'text-slate-800' : 'text-slate-600'}`}>底层 BOM 拆解与护城河成本 (自己看)</span>
+                                  </div>
+                                  {isBomOpen ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                                 </button>
-                              </div>
-                              <div className="flex-1 bg-white rounded-xl border border-blue-50 p-4 shadow-sm">
-                                <p className="text-sm text-slate-700 font-mono leading-relaxed whitespace-pre-wrap selection:bg-blue-200">
-                                  {localQuote?.whatsapp_script || 'Waiting for AI generation...'}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300">
-                            <button 
-                              onClick={() => setIsWarningsOpen(!isWarningsOpen)}
-                              className="w-full px-6 py-4 flex items-center justify-between bg-slate-50 hover:bg-slate-100 transition-colors"
-                            >
-                              <div className="flex items-center gap-2">
-                                <ShieldAlert className={`w-5 h-5 ${isWarningsOpen ? 'text-amber-600' : 'text-slate-400'}`} />
-                                <span className={`font-bold text-sm ${isWarningsOpen ? 'text-slate-800' : 'text-slate-600'}`}>打样防翻车工艺预警 (发给工厂)</span>
-                                {!isWarningsOpen && <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-black rounded-full">⚠️ 存在风险</span>}
-                              </div>
-                              {isWarningsOpen ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                            </button>
-                            
-                            {isWarningsOpen && (
-                              <div className="p-6 border-t border-slate-100 bg-amber-50/30 relative animate-in slide-in-from-top-2 duration-200">
-                                <p className="text-sm text-amber-900/80 leading-relaxed whitespace-pre-wrap pr-12">
-                                  {localQuote?.factory_warnings || '未检测到明显工艺风险。'}
-                                </p>
-                                <button onClick={() => handleCopy(localQuote?.factory_warnings || '', 'factory')} className="absolute top-6 right-6 p-2 bg-white rounded-md shadow-sm border border-amber-200 text-amber-600 hover:bg-amber-600 hover:text-white transition-colors">
-                                  {isCopiedFactory ? <CheckCheck className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 relative ${!isPro ? 'pb-16' : ''}`}>
-                            <button 
-                              onClick={() => setIsBomOpen(!isBomOpen)}
-                              className="w-full px-6 py-4 flex items-center justify-between bg-slate-50 hover:bg-slate-100 transition-colors"
-                            >
-                              <div className="flex items-center gap-2">
-                                <BarChart3 className={`w-5 h-5 ${isBomOpen ? 'text-slate-800' : 'text-slate-400'}`} />
-                                <span className={`font-bold text-sm ${isBomOpen ? 'text-slate-800' : 'text-slate-600'}`}>底层 BOM 拆解与护城河成本 (自己看)</span>
-                              </div>
-                              {isBomOpen ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                            </button>
-                            
-                            {isBomOpen && (
-                              <div className={`border-t border-slate-100 animate-in slide-in-from-top-2 duration-200 ${!isPro ? 'filter blur-[4px] grayscale opacity-50 select-none pointer-events-none' : ''}`}>
-                                <table className="w-full text-left">
-                                  <thead className="bg-white border-b border-slate-100">
-                                    <tr>
-                                      <th className="px-6 py-3 font-bold text-slate-400 text-xs uppercase tracking-wider">物料/工艺明细 (USD)</th>
-                                      <th className="px-6 py-3 font-bold text-slate-400 text-xs uppercase tracking-wider text-right w-32">成本</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-50">
-                                    {currentPlan.bom && Array.isArray(currentPlan.bom) ? currentPlan.bom.map((item: any, idx: number) => (
-                                        <tr key={idx} className="bg-white hover:bg-slate-50 transition-colors">
-                                          <td className="px-6 py-3 text-slate-700 font-medium text-sm">{item.name || item.item}</td>
-                                          <td className="px-6 py-3 text-right font-mono font-bold text-slate-700">${item.cost || 0}</td>
+                                
+                                {isBomOpen && (
+                                  <div className={`border-t border-slate-100 animate-in slide-in-from-top-2 duration-200 ${!isPro ? 'filter blur-[4px] grayscale opacity-50 select-none pointer-events-none' : ''}`}>
+                                    <table className="w-full text-left">
+                                      <thead className="bg-white border-b border-slate-100">
+                                        <tr>
+                                          <th className="px-6 py-3 font-bold text-slate-400 text-xs uppercase tracking-wider">物料/工艺明细 (USD)</th>
+                                          <th className="px-6 py-3 font-bold text-slate-400 text-xs uppercase tracking-wider text-right w-32">成本</th>
                                         </tr>
-                                      )) : (
-                                      <tr><td colSpan={2} className="px-6 py-6 text-center text-slate-400 text-sm">暂无明细</td></tr>
-                                    )}
-                                    <tr className="bg-slate-50/50">
-                                      <td className="px-6 py-3 text-slate-500 font-medium text-xs flex items-center gap-1.5"><Tag className="w-3 h-3"/> 包装及辅料费 (系统硬算)</td>
-                                      <td className="px-6 py-3 text-right font-mono font-bold text-slate-500">${(1 / exchangeRate).toFixed(2)}</td>
-                                    </tr>
-                                    <tr className="bg-slate-50/50">
-                                      <td className="px-6 py-3 text-slate-500 font-medium text-xs flex items-center gap-1.5"><TrendingUp className="w-3 h-3"/> 国内内陆运费 (系统硬算)</td>
-                                      <td className="px-6 py-3 text-right font-mono font-bold text-slate-500">${(1 / exchangeRate).toFixed(2)}</td>
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-50">
+                                        {currentPlan.bom && Array.isArray(currentPlan.bom) ? currentPlan.bom.map((item: any, idx: number) => (
+                                            <tr key={idx} className="bg-white hover:bg-slate-50 transition-colors">
+                                              <td className="px-6 py-3 text-slate-700 font-medium text-sm">{item.name || item.item}</td>
+                                              <td className="px-6 py-3 text-right font-mono font-bold text-slate-700">${item.cost || 0}</td>
+                                            </tr>
+                                          )) : (
+                                          <tr><td colSpan={2} className="px-6 py-6 text-center text-slate-400 text-sm">暂无明细</td></tr>
+                                        )}
+                                        <tr className="bg-slate-50/50">
+                                          <td className="px-6 py-3 text-slate-500 font-medium text-xs flex items-center gap-1.5"><Tag className="w-3 h-3"/> 包装及辅料费 (系统硬算)</td>
+                                          <td className="px-6 py-3 text-right font-mono font-bold text-slate-500">${(1 / exchangeRate).toFixed(2)}</td>
+                                        </tr>
+                                        <tr className="bg-slate-50/50">
+                                          <td className="px-6 py-3 text-slate-500 font-medium text-xs flex items-center gap-1.5"><TrendingUp className="w-3 h-3"/> 国内内陆运费 (系统硬算)</td>
+                                          <td className="px-6 py-3 text-right font-mono font-bold text-slate-500">${(1 / exchangeRate).toFixed(2)}</td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
 
-                            {!isPro && isBomOpen && (
-                              <div className="absolute inset-0 top-[60px] z-10 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px]">
-                                <div className="bg-white px-6 py-5 rounded-2xl shadow-xl flex flex-col items-center border border-slate-200">
-                                  <ShieldCheck className="w-8 h-8 text-slate-900 mb-2" />
-                                  <p className="text-xs font-bold text-slate-800 mb-3">升级 Pro 解锁精确成本拆解</p>
-                                  <button onClick={() => setShowProPaywall(true)} className="px-6 py-2 bg-slate-900 text-white font-bold rounded-lg text-xs hover:bg-slate-800 shadow-md">
-                                    立即解锁
-                                  </button>
-                                </div>
+                                {!isPro && isBomOpen && (
+                                  <div className="absolute inset-0 top-[60px] z-10 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px]">
+                                    <div className="bg-white px-6 py-5 rounded-2xl shadow-xl flex flex-col items-center border border-slate-200">
+                                      <ShieldCheck className="w-8 h-8 text-slate-900 mb-2" />
+                                      <p className="text-xs font-bold text-slate-800 mb-3">升级 Pro 解锁精确成本拆解</p>
+                                      <button onClick={() => setShowProPaywall(true)} className="px-6 py-2 bg-slate-900 text-white font-bold rounded-lg text-xs hover:bg-slate-800 shadow-md">
+                                        立即解锁
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                          
-                          <div className="h-20"></div>
+                              
+                              <div className="h-20"></div>
 
-                        </div>
-                      );
-                    })()}
+                            </div>
+                          );
+                        })()}
+                      </>
+                    )}
                   </div>
 
-                  <div className="border-t border-slate-200 bg-white/80 backdrop-blur-md p-4 shrink-0 flex items-center justify-between gap-4 z-20 sticky bottom-0">
-                    <button onClick={handleSaveChanges} disabled={isSaving} className="px-5 py-2.5 bg-slate-100 text-slate-600 font-bold rounded-xl text-sm hover:bg-slate-200 transition-colors flex items-center gap-2">
-                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} <span className="hidden sm:inline">保存</span>
-                    </button>
-                    <div className="flex items-center gap-3">
-                      <button 
-                        onClick={() => {
-                          if (!isPro) {
-                            setShowProPaywall(true);
-                          } else {
-                            trackEvent('export_pdf', { plan_type: activeTab }, inquiry?.user_id);
-                            setShowExportModal(true);
-                          }
-                        }} 
-                        className="px-6 sm:px-8 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-sm shadow-lg shadow-slate-900/20 hover:bg-slate-800 transition-all flex items-center gap-2"
-                      >
-                        <FileText className="w-4 h-4" /> 生成对客 PDF
+                  {localQuote?.plans && availablePlans.length > 0 && (
+                    <div className="border-t border-slate-200 bg-white/80 backdrop-blur-md p-4 shrink-0 flex items-center justify-between gap-4 z-20 sticky bottom-0">
+                      <button onClick={handleSaveChanges} disabled={isSaving} className="px-5 py-2.5 bg-slate-100 text-slate-600 font-bold rounded-xl text-sm hover:bg-slate-200 transition-colors flex items-center gap-2">
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} <span className="hidden sm:inline">保存</span>
                       </button>
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => {
+                            if (!isPro) {
+                              setShowProPaywall(true);
+                            } else {
+                              trackEvent('export_pdf', { plan_type: activeTab }, inquiry?.user_id);
+                              setShowExportModal(true);
+                            }
+                          }} 
+                          className="px-6 sm:px-8 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-sm shadow-lg shadow-slate-900/20 hover:bg-slate-800 transition-all flex items-center gap-2"
+                        >
+                          <FileText className="w-4 h-4" /> 生成对客 PDF
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                 </div>
               </>
@@ -496,6 +517,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
         </div>
       </div>
 
+      {/* 以下是模态框代码，保持不变 */}
       {showProPaywall && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-[800px] w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 relative">
