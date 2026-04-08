@@ -191,9 +191,11 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
               </div>
             </div>
             
-            <div className="flex-1 max-w-xs mx-4">
+            <div className="flex-1 max-w-md mx-4"> 
               <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-slate-900 transition-all h-9">
-                <span className="px-3 text-slate-500 text-xs font-bold bg-slate-100 border-r border-slate-200 h-full flex items-center">款号 Style No.</span>
+                <span className="px-3 text-slate-500 text-xs font-bold bg-slate-100 border-r border-slate-200 h-full flex items-center whitespace-nowrap shrink-0">
+                  款号 Style No.
+                </span>
                 <input type="text" value={styleNo} onChange={(e) => setStyleNo(e.target.value)} placeholder="选填，将印在 PDF 上" className="w-full px-3 py-1 text-sm text-slate-800 bg-transparent outline-none placeholder:text-slate-300" />
               </div>
             </div>
@@ -291,7 +293,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                 <div className="flex-1 flex flex-col min-w-0">
                   <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
                     
-                    {/* 唯一的数据判断入口 */}
                     {!localQuote?.plans || availablePlans.length === 0 ? (
                       <div className="flex flex-col items-center justify-center bg-white border border-slate-200 border-dashed rounded-2xl p-10 text-center h-full shadow-sm">
                         <BarChart3 className="w-12 h-12 text-slate-300 mb-4" />
@@ -335,7 +336,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                           const realCnyValue = (finalPriceValue * 7.2).toFixed(2);
 
                           return (
-                            <div className="space-y-6 max-w-4xl animate-in slide-in-from-bottom-2 duration-300">
+                            <div className="space-y-6 w-full animate-in slide-in-from-bottom-2 duration-300">
                               
                               <div className="flex flex-col sm:flex-row gap-4">
                                 <div className="flex-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
@@ -349,7 +350,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                                     <div className="flex items-baseline gap-2 text-3xl font-black text-slate-800">
                                       {hasRange ? `$${costRange[0].toFixed(2)} - ${costRange[1].toFixed(2)}` : `$${safeCost.toFixed(2)}`}
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-2 truncate group-hover:whitespace-normal group-hover:text-clip transition-all">
+                                    <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
                                       {localQuote?.disclaimer || '基于行业基准估算，实际请与工厂确认'}
                                     </p>
                                 </div>
@@ -517,7 +518,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
         </div>
       </div>
 
-      {/* 以下是模态框代码，保持不变 */}
       {showProPaywall && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-[800px] w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 relative">
