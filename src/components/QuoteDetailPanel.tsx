@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, BotMessageSquare, Loader2, BarChart3, TrendingUp, 
-  FileText, Calculator, RefreshCw, Copy, CheckCheck, Edit3, Save, MessageCircle, Send, Crown,
+  FileText, Calculator, RefreshCw, Copy, CheckCheck, Edit3, Save, MessageCircle, Tag, Send, Crown,
   Lock, AlertTriangle, ShieldCheck, Clock, ShieldAlert, ChevronDown, ChevronUp
 } from 'lucide-react'; 
 import { supabase } from '@/src/utils/supabase/client'; 
