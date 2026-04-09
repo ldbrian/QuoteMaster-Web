@@ -41,7 +41,7 @@ export default function LandingPage() {
               onClick={() => trackEvent('click_nav_claim_gift')}
               className="px-4 py-2 text-sm font-bold text-slate-900 bg-slate-100 border border-slate-200 hover:bg-slate-900 hover:text-white rounded-full transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
             >
-              <Gift size={14} /> 领取 15 次免费算力
+              <Gift size={14} /> 领取 5 次免费算力
             </Link>
           </div>
         </div>
@@ -181,7 +181,7 @@ export default function LandingPage() {
               onClick={() => trackEvent('click_footer_cta_free')}
               className="w-full sm:w-auto px-8 py-4 text-base font-bold text-slate-700 bg-white border-2 border-slate-200 hover:border-slate-900 hover:text-slate-900 rounded-xl shadow-sm transition-all"
             >
-              免费体验基础版 (送 15 次)
+              免费体验基础版 (送 5 次)
             </Link>
             <Link 
               href="/dashboard" 
