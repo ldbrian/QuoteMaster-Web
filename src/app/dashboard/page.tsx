@@ -42,7 +42,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<any>(null); 
   const [showGiftModal, setShowGiftModal] = useState(false); 
   const [showPayModal, setShowPayModal] = useState(false); 
-  const [showMilestoneModal, setShowMilestoneModal] = useState(false); // 🌟 第5次使用里程碑
+  const [showMilestoneModal, setShowMilestoneModal] = useState(false); 
 
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showUploadQuoteModal, setShowUploadQuoteModal] = useState(false);
@@ -57,12 +57,29 @@ export default function Dashboard() {
 
   const isPro = profile?.tier === 'pro';
 
-  // 🌟 计算被锁定的历史记录数量 (> 7天)
   const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
   const oldLeadsCount = useMemo(() => {
     const nowMs = new Date().getTime();
     return leads.filter(l => nowMs - new Date(l.created_at).getTime() > SEVEN_DAYS_MS).length;
   }, [leads]);
+
+  // 🔪 核心修复点 1：强制传入 userId 进行查询隔离
+  const fetchLeads = async (userId: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('inquiries')
+        .select('*')
+        .eq('user_id', userId) // <-- 这就是修补越权漏洞的关键一刀
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setLeads(data || []);
+    } catch (error) {
+      console.error("获取线索失败：", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -71,7 +88,8 @@ export default function Dashboard() {
         router.push('/login');
       } else {
         setUser(session.user);
-        fetchLeads();
+        // 🔪 核心修复点 2：将真实 ID 传给查询函数
+        fetchLeads(session.user.id);
         fetchUserProfile(session.user.id); 
         trackEvent('view_dashboard', {}, session.user.id);
       }
@@ -96,7 +114,6 @@ export default function Dashboard() {
         if (data.tier === 'free' && data.total_usage_count === 0 && !localStorage.getItem('giftClaimed')) {
           setShowGiftModal(true);
         }
-        // 🌟 核心埋点 5：第 5 次使用强制跳出升级引导
         if (data.tier !== 'pro' && data.total_usage_count === 5 && !localStorage.getItem('milestonePrompted')) {
           setShowMilestoneModal(true);
           localStorage.setItem('milestonePrompted', 'true');
@@ -104,19 +121,6 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error("无法获取用户档案", err);
-    }
-  };
-
-  const fetchLeads = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('inquiries').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      setLeads(data || []);
-    } catch (error) {
-      console.error("获取线索失败：", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -129,7 +133,8 @@ export default function Dashboard() {
         { event: '*', schema: 'public', table: 'inquiries' },
         (payload) => {
           console.log('⚡ 接收到 Worker 捷报，触发 UI 无感刷新!', payload);
-          fetchLeads(); 
+          // 🔪 核心修复点 3：无感刷新时同样要传 ID
+          fetchLeads(user.id); 
           fetchUserProfile(user.id); 
         }
       )
@@ -183,7 +188,7 @@ export default function Dashboard() {
       await supabase.from('inquiries').delete().eq('id', id);
     } catch (error: any) {
       alert('删除失败: ' + error.message);
-      fetchLeads(); 
+      if(user) fetchLeads(user.id); 
     }
   };
 
@@ -203,7 +208,7 @@ export default function Dashboard() {
       if (error) throw error; 
     } catch (error) {
       alert("错误已打印在浏览器控制台，请按 F12 查看！");
-      fetchLeads();
+      if(user) fetchLeads(user.id);
     }
   };
 
@@ -217,7 +222,6 @@ export default function Dashboard() {
   const handleOpenDetail = async (lead: any) => {
     if (lead.status === 'analyzing' || lead.status === 'pending') return;
     
-    // 🌟 核心埋点 4：历史记录锁定判断
     const nowMs = new Date().getTime();
     const isOld = nowMs - new Date(lead.created_at).getTime() > SEVEN_DAYS_MS;
     if (!isPro && isOld) {
@@ -392,7 +396,6 @@ export default function Dashboard() {
                   </tbody>
                 </table>
                 
-                {/* 🌟 核心埋点 4：列表底部的历史锁定焦虑感提示 */}
                 {!isPro && oldLeadsCount > 0 && (
                   <div className="bg-rose-50 border-t border-rose-100 p-4 text-center mt-auto">
                     <p className="text-sm text-rose-600 font-bold flex items-center justify-center gap-2">
@@ -410,11 +413,10 @@ export default function Dashboard() {
       <NewQuoteModal 
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); if(user) fetchUserProfile(user.id); }} 
-        onSuccess={() => { setIsModalOpen(false); fetchLeads(); if(user) fetchUserProfile(user.id); }} 
+        onSuccess={() => { setIsModalOpen(false); if(user) fetchLeads(user.id); if(user) fetchUserProfile(user.id); }} 
         onSelectDemo={(demoData) => { setIsModalOpen(false); setSelectedInquiryId(demoData.id); setDetailData(demoData); }} 
       />
       
-      {/* 🌟 传入 isPro 基因激活 QuoteDetailPanel 里的模糊逻辑 */}
       <QuoteDetailPanel 
         isOpen={!!selectedInquiryId} 
         onClose={() => { setSelectedInquiryId(null); setDetailData(null); }} 
@@ -431,7 +433,6 @@ export default function Dashboard() {
         onRetry={handleDetailRetry}
       />
 
-      {/* --- 第5次使用里程碑弹窗 --- */}
       {showMilestoneModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-white max-w-sm rounded-3xl p-8 text-center shadow-2xl relative border border-slate-100 animate-in zoom-in-95">
@@ -449,7 +450,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* --- 🌟 终极高转化率 Paywall 弹窗 (替换掉了原来的咖啡弹窗) --- */}
       {showPayModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-[800px] w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 relative">
@@ -457,7 +457,6 @@ export default function Dashboard() {
               <X className="w-5 h-5" />
             </button>
             
-            {/* 左侧情绪放大区 */}
             <div className="bg-slate-900 text-white p-8 md:w-5/12 flex flex-col justify-center relative overflow-hidden">
               <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-600 rounded-full blur-3xl opacity-30"></div>
               <Crown className="w-12 h-12 text-amber-400 mb-6 relative z-10" />
@@ -482,7 +481,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* 右侧强转化区 */}
             <div className="p-8 md:w-7/12 bg-white flex flex-col justify-center">
               <div className="text-center mb-6">
                 <h3 className="text-xl font-bold text-slate-800 mb-2">选择您的赚钱装备</h3>
@@ -520,7 +518,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 任务赚算力弹窗 */}
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
@@ -581,7 +578,6 @@ export default function Dashboard() {
         </div>
       )}
       
-      {/* 贡献底价弹窗 */}
       {showUploadQuoteModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden relative">
@@ -643,7 +639,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 新手礼包弹窗 */}
       {showGiftModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
           <div className="bg-white max-w-sm w-full rounded-3xl shadow-2xl p-8 text-center relative overflow-hidden transform transition-all scale-100 animate-in zoom-in-90 border border-slate-100">
@@ -662,7 +657,6 @@ export default function Dashboard() {
   );
 }
 
-// === 下方组件 ===
 function NavItem({ icon, label, active, disabled, badge }: { icon: React.ReactNode, label?: string, active?: boolean, disabled?: boolean, badge?: string }) {
   return (
     <div className={`flex items-center justify-between w-full px-4 h-11 rounded-lg transition-all 
