@@ -274,7 +274,7 @@ export default function Dashboard() {
           <div className="mt-4 mb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
             <Flame size={12} className="text-rose-500 animate-pulse" /> 商业情报 (AI 赋能)
           </div>
-          <div onClick={() => alert("🔥 【AI 爆款趋势分析】\n\n该功能目前已静默集成在『新建核价』流程中。AI 会在分析成本时，自动从 TikTok/Instagram 提取匹配的款式热词，生成对客营销话术。")}>
+          <div onClick={() => alert("🔥 【AI 爆款趋势分析】\n\n该功能目前已静默集成在『新建核价』流程中。AI 会在分析成本时，自动从全网提取匹配的品类/商业热词，生成对客营销话术。")}>
             <NavItem icon={<TrendingUp size={20} />} label="AI 爆款趋势分析" badge="已激活" />
           </div>
           <div onClick={() => alert("🔥 【全球采买价格雷达】正在研发中！\n\n未来您可以通过上传真实打样数据，解锁以下特权：\n1. 查看北美/欧洲本周暴增询盘品类\n2. 获取同行该类目的真实成交底价区间\n\n敬请期待！")}>
@@ -468,7 +468,7 @@ export default function Dashboard() {
               <div className="space-y-4 relative z-10">
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                  <p className="text-sm"><strong className="text-white block">双引擎防坑算价</strong>毛衫/梭织独立算法，摸清利润底牌</p>
+                  <p className="text-sm"><strong className="text-white block">跨品类自适应算价</strong>服装/五金等多行业独立算法，摸清底牌</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <TrendingUp className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
