@@ -52,19 +52,19 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto text-center space-y-8">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-sm font-black mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-sm uppercase tracking-wide">
             <Zap size={16} className="text-blue-500" />
-            专为外贸单兵打造的“稳单+避坑”战斧
+            涵盖服装/箱包/五金/机械的外贸核价引擎
           </div>
           
           <h1 className="text-5xl md:text-7xl font-black tracking-tight text-slate-900 leading-[1.1] animate-in fade-in slide-in-from-bottom-6 duration-700">
-            告别“等工厂回复”，<br />
+            工厂不回消息？<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
-              拿回外贸成单主动权。
+              AI 帮你一键看透底价。
             </span>
           </h1>
           
           <div className="max-w-3xl mx-auto text-lg md:text-xl text-slate-600 leading-relaxed font-medium animate-in fade-in slide-in-from-bottom-8 duration-1000 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mt-8">
-            QuoteMaster 不是冰冷的算价器，而是你的<strong className="text-slate-900">【信息保真与决策终端】</strong>。<br/>
-            在工厂“装死”拖延时，给你秒级的底价与交期预判。当同行还在苦苦催促厂长时，你已经用极度地道的提案稳住了客户。
+            QuoteMaster 不是冰冷的算价器，更是你的<strong className="text-slate-900">【全品类报价决策终端】</strong>。<br/>
+            专为外贸单兵打造，1分钟内精准估算各类产品（<strong className="text-blue-600">服装、箱包、五金配件、工业轻工等</strong>）的底层成本，提前预警打样踩坑风险。当同行还在苦苦催促厂长时，你已经用极度地道的行业提案稳住了客户。
           </div>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6 animate-in fade-in slide-in-from-bottom-10 duration-1000">
@@ -75,6 +75,20 @@ export default function LandingPage() {
             >
               免费开启极速核价 <ArrowRight size={20} />
             </Link>
+          </div>
+
+          {/* ✨ 真实用户信任背书 (太阳能支架梗) */}
+          <div className="mt-8 flex justify-center animate-in fade-in slide-in-from-bottom-12 duration-1000">
+            <div className="inline-flex items-center gap-3 px-5 py-2.5 bg-slate-800 text-slate-200 rounded-full text-sm font-medium shadow-lg border border-slate-700 max-w-2xl text-left">
+              <span className="flex h-2 w-2 relative shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="truncate">
+                <strong className="text-emerald-400">真实用户测试：</strong> 
+                上传“太阳能电池板安装支架”，AI 自动识别铝材重量与喷砂工艺，一键拆解五金 BOM。
+              </span>
+            </div>
           </div>
         </div>
 
@@ -99,7 +113,7 @@ export default function LandingPage() {
                 <AlertTriangle size={24} className="text-amber-500" />
               </div>
               <h3 className="text-xl font-bold mb-3 text-slate-800">鸡同鸭讲的“打样翻车”</h3>
-              <p className="text-slate-600 text-sm leading-relaxed">客户发图要“底部翻边”，打样师傅按常规做，结果全起褶皱报废。师傅不懂英文，客户不懂工艺，你夹在中间背黑锅。</p>
+              <p className="text-slate-600 text-sm leading-relaxed">客户随便发张图，隐藏的工艺陷阱你看不出。不管是服装面料缩水，还是五金件的孔位公差，一旦打样翻车，你夹在中间背黑锅甚至赔钱。</p>
             </div>
 
             <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all group">
@@ -138,7 +152,7 @@ export default function LandingPage() {
                   <ShieldAlert className="text-amber-400" size={24} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold mb-2">降伏工厂：打样防翻车指南</h3>
+                  <h3 className="text-xl font-bold mb-2">降伏工厂：跨品类防翻车指南</h3>
                   <p className="text-slate-400 text-sm leading-relaxed">独家视觉大模型，能从高糊网图中精准抓取“隐藏工艺陷阱”。一键生成带中文警告的【避坑工艺单】，让打样师傅一次做对，打样过稿率飙升。</p>
                 </div>
               </div>
@@ -149,7 +163,7 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold mb-2">掌控底牌：X光级 BOM 护城河</h3>
-                  <p className="text-slate-400 text-sm leading-relaxed">彻底拒绝被工厂糊弄。AI 强行拆解纯面辅料与加工费，给出绝对安全的底价区间。配合 A/B 阶梯降级方案，一键渲染大厂级 PDF 报价书，堵死还价空间。</p>
+                  <p className="text-slate-400 text-sm leading-relaxed">彻底拒绝被工厂糊弄。AI 强行拆解纯原材与加工费，给出绝对安全的底价区间。配合 A/B 阶梯降级方案，一键渲染大厂级 PDF 报价书，堵死还价空间。</p>
                 </div>
               </div>
             </div>
@@ -200,7 +214,7 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto mt-24 border-t border-slate-200 pt-8 pb-4 text-center">
           <p className="text-xs text-slate-400 flex items-center justify-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-            QuoteMaster AI Terminal™ · 外贸单兵的超级副驾
+            QuoteMaster AI Terminal™ · 跨界外贸单兵的超级副驾
           </p>
         </div>
       </main>
