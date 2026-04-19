@@ -562,7 +562,7 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <p className="text-xs font-bold text-slate-800 mb-2">👇 扫码添加开发者微信开通</p>
-                <div className="w-24 h-24 bg-white border border-slate-200 mx-auto rounded-lg shadow-sm p-1 mb-2"><img src="/pay-qr.jpg" alt="WeChat QR" className="w-full h-full object-contain" /></div>
+                <div className="w-24 h-24 bg-white border border-slate-200 mx-auto rounded-lg shadow-sm p-1 mb-2"><img src="/pay-qr.png" alt="WeChat QR" className="w-full h-full object-contain" /></div>
               </div>
             </div>
           </div>
