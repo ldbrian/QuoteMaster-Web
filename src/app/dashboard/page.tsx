@@ -5,6 +5,8 @@ import { supabase } from '@/src/utils/supabase/client';
 import { useRouter } from 'next/navigation'; 
 import NewQuoteModal from '@/src/components/NewQuoteModal'; 
 import QuoteDetailPanel from '@/src/components/QuoteDetailPanel';
+import ActiveWaitingModal from '@/src/components/ActiveWaitingModal'; // 🌟 新增导入：等待轮播弹窗
+import QuoteFeedback from '@/src/components/QuoteFeedback'; // 🌟 新增导入：评价组件
 import { trackEvent } from '@/src/utils/analytics'; 
 import { 
   Search, Bell, Plus, MoreVertical, LogOut,
@@ -63,14 +65,18 @@ export default function Dashboard() {
     return leads.filter(l => nowMs - new Date(l.created_at).getTime() > SEVEN_DAYS_MS).length;
   }, [leads]);
 
-  // 🔪 核心修复点 1：强制传入 userId 进行查询隔离
+  // 🌟 新增：全局监听是否有正在分析中的任务，如果有，自动唤醒弹窗并阻塞 UI
+  const isAnalyzingQuote = useMemo(() => {
+    return leads.some(lead => lead.status === 'analyzing' || lead.status === 'pending');
+  }, [leads]);
+
   const fetchLeads = async (userId: string) => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('inquiries')
         .select('*')
-        .eq('user_id', userId) // <-- 这就是修补越权漏洞的关键一刀
+        .eq('user_id', userId) 
         .order('created_at', { ascending: false });
       if (error) throw error;
       setLeads(data || []);
@@ -88,7 +94,6 @@ export default function Dashboard() {
         router.push('/login');
       } else {
         setUser(session.user);
-        // 🔪 核心修复点 2：将真实 ID 传给查询函数
         fetchLeads(session.user.id);
         fetchUserProfile(session.user.id); 
         trackEvent('view_dashboard', {}, session.user.id);
@@ -133,7 +138,6 @@ export default function Dashboard() {
         { event: '*', schema: 'public', table: 'inquiries' },
         (payload) => {
           console.log('⚡ 接收到 Worker 捷报，触发 UI 无感刷新!', payload);
-          // 🔪 核心修复点 3：无感刷新时同样要传 ID
           fetchLeads(user.id); 
           fetchUserProfile(user.id); 
         }
@@ -410,6 +414,9 @@ export default function Dashboard() {
         </div>
       </main>
 
+      {/* 🌟 挂载 1：等待弹窗，根据 isAnalyzingQuote 自动阻塞 UI */}
+      <ActiveWaitingModal isOpen={isAnalyzingQuote} />
+
       <NewQuoteModal 
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); if(user) fetchUserProfile(user.id); }} 
@@ -433,6 +440,16 @@ export default function Dashboard() {
         onRetry={handleDetailRetry}
       />
 
+      {/* 🌟 挂载 2：评价悬浮舱（仅在显示测算结果时滑出，覆盖在面板上方） */}
+      {selectedInquiryId && detailData && !isAnalyzingQuote && detailData.status === 'completed' && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] bg-white px-6 py-4 rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border border-slate-100 animate-in slide-in-from-bottom-10 fade-in duration-300">
+          <QuoteFeedback 
+            inquiryId={selectedInquiryId} 
+            category={detailData.category || 'Other'} 
+          />
+        </div>
+      )}
+
       {showMilestoneModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-white max-w-sm rounded-3xl p-8 text-center shadow-2xl relative border border-slate-100 animate-in zoom-in-95">
@@ -450,6 +467,7 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* 以下 Modal 保留原有代码，不占用篇幅... */}
       {showPayModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
           <div className="bg-white max-w-[800px] w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 relative">
