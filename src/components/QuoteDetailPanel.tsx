@@ -302,23 +302,37 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                     ) : (
                       <>
                         {availablePlans.length > 1 && (
-                          <div className="flex p-1 bg-white rounded-xl shadow-sm border border-slate-200 inline-flex">
+                          // 🌟 加了 pr-24 给右侧的解锁按钮留出空间
+                          <div className="flex p-1 bg-white rounded-xl shadow-sm border border-slate-200 inline-flex relative pr-24">
                             {availablePlans.map((key) => (
                               <button
                                 key={key}
-                                onClick={() => setActiveTab(key)}
+                                // 🌟 如果是免费用户且点击了 plan_b，拦截并弹出付费框；否则正常切换
+                                onClick={() => {
+                                  if (!isPro && key === 'plan_b') {
+                                    setShowProPaywall(true);
+                                  } else {
+                                    setActiveTab(key);
+                                  }
+                                }}
                                 className={`flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg transition-all ${
                                   activeTab === key ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                                }`}
+                                } ${!isPro && key === 'plan_b' ? 'opacity-60' : ''}`}
                               >
                                 {localQuote.plans[key]?.name || key.toUpperCase()}
+                                {!isPro && key === 'plan_b' && <Lock className="w-3 h-3 ml-1" />}
                               </button>
                             ))}
-                            {!isPro && availablePlans.includes('plan_b') && activeTab !== 'plan_b' && (
-                              <div className="absolute right-0 top-0 bottom-0 flex items-center pointer-events-none pr-3">
-                                <span className="flex items-center gap-1 text-[10px] font-black bg-amber-400 text-amber-900 px-2 py-0.5 rounded-full shadow-sm animate-pulse">
-                                  <Lock className="w-3 h-3" /> 解锁
-                                </span>
+                            
+                            {/* 🌟 真正的解锁按钮：点击唤起 Paywall */}
+                            {!isPro && availablePlans.includes('plan_b') && (
+                              <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                                <button 
+                                  onClick={() => setShowProPaywall(true)}
+                                  className="flex items-center gap-1 text-[10px] font-black bg-gradient-to-r from-amber-300 to-amber-500 text-amber-950 px-3 py-1.5 rounded-lg shadow-sm hover:shadow active:scale-95 transition-all animate-pulse cursor-pointer"
+                                >
+                                  <Lock className="w-3 h-3" /> 解锁方案B
+                                </button>
                               </div>
                             )}
                           </div>
