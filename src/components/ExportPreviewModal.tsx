@@ -58,19 +58,21 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
     }
   };
 
+  // 🌟 核心修复：Excel 导出也加上 final_price 兜底
   const handleExportExcel = async () => {
     try {
       const XLSX = await import('xlsx');
       
       const excelData = planKeys.map((key) => {
         const plan = quoteData.plans[key];
+        if (!plan) return null;
         return {
           "Option": plan.name,
           "Material & Specs": plan.simplified_materials,
-          "MOQ (pcs)": plan.moq,
-          "Estimated FOB Price": plan.fob_price_range
+          "MOQ (pcs)": plan.moq || quoteData.moq, // 兼容全局起订量
+          "Estimated FOB Price": plan.fob_price_range || `$${(plan.final_price || 0).toFixed(2)}`
         };
-      });
+      }).filter(Boolean);
 
       const worksheet = XLSX.utils.json_to_sheet(excelData);
       worksheet['!cols'] = [{ wch: 30 }, { wch: 60 }, { wch: 15 }, { wch: 25 }];
@@ -85,7 +87,6 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
   };
 
   return (
-    // 🌟 Z-index 提升为 100，坚如磐石的最顶层
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 md:p-8 transition-opacity">
       <div className="bg-white w-full max-w-6xl h-full max-h-[90vh] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-in zoom-in-95 duration-200">
         
@@ -228,14 +229,18 @@ export default function ExportPreviewModal({ isOpen, onClose, quoteData }: Expor
                           <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
                           <div className="text-right">
                             <span className="text-sm text-slate-500 mr-2">Est. FOB:</span>
-                            <span className="text-xl font-bold text-blue-700 font-mono">{plan.fob_price_range || `$${plan.final_price?.toFixed(2)}`}</span>
+                            {/* 🌟 核心修复：增加最终价格兜底处理 */}
+                            <span className="text-xl font-bold text-blue-700 font-mono">
+                              {plan.fob_price_range || `$${(plan.final_price || 0).toFixed(2)}`}
+                            </span>
                           </div>
                         </div>
                         <p className="text-sm text-slate-600 mb-3 leading-relaxed">
                           <strong>Materials & Specs:</strong> {plan.simplified_materials}
                         </p>
                         <div className="inline-block bg-white border border-slate-200 rounded px-3 py-1 text-sm font-medium text-slate-700">
-                          Requires MOQ: <span className="font-bold text-slate-900">{plan.moq} pcs</span>
+                          {/* 🌟 核心修复：兼容传递下来的全局 moq */}
+                          Requires MOQ: <span className="font-bold text-slate-900">{plan.moq || quoteData.moq} pcs</span>
                         </div>
                       </div>
                     );

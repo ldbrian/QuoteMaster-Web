@@ -162,17 +162,29 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
     setRetryNote('');
   };
 
+  // 🌟 核心修复：遍历结算导出数据
   const getExportData = () => {
-    if (!localQuote?.plans || !activeTab) return localQuote;
-    const plan = localQuote.plans?.[activeTab];
+    if (!localQuote?.plans) return localQuote;
+    
+    // 深拷贝一份用于导出，防止污染当前 UI 的状态
+    const exportQuote = JSON.parse(JSON.stringify(localQuote));
+
+    // 遍历所有的方案，统一用当前界面的汇率和利润率计算最终售价
+    Object.keys(exportQuote.plans).forEach(key => {
+      const plan = exportQuote.plans[key];
+      const safeCost = getSafeCost(plan);
+      const totalSafeCost = safeCost + (2 / exchangeRate); // 底层成本 + 国内杂费
+      
+      // 强制计算所有方案的 final_price，避免未点击的 Tab 丢失数据
+      if (key !== activeTab || !plan.final_price) {
+        plan.final_price = totalSafeCost * markup;
+      }
+    });
+
     return {
-      ...localQuote,
-      product_name: `${localQuote.product_name} - ${plan?.name || activeTab.toUpperCase()}`,
+      ...exportQuote,
       style_no: styleNo, 
-      bom: plan?.bom || [],
-      margin: (plan?.margin * plan?.final_price) || 0,
-      final_price: plan?.final_price || 0,
-      moq: moq 
+      moq: moq // 传递全局起订量
     };
   };
 
@@ -302,12 +314,10 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                     ) : (
                       <>
                         {availablePlans.length > 1 && (
-                          // 🌟 加了 pr-24 给右侧的解锁按钮留出空间
                           <div className="flex p-1 bg-white rounded-xl shadow-sm border border-slate-200 inline-flex relative pr-24">
                             {availablePlans.map((key) => (
                               <button
                                 key={key}
-                                // 🌟 如果是免费用户且点击了 plan_b，拦截并弹出付费框；否则正常切换
                                 onClick={() => {
                                   if (!isPro && key === 'plan_b') {
                                     setShowProPaywall(true);
@@ -324,7 +334,6 @@ export default function QuoteDetailPanel({ isOpen, onClose, inquiry, quoteData, 
                               </button>
                             ))}
                             
-                            {/* 🌟 真正的解锁按钮：点击唤起 Paywall */}
                             {!isPro && availablePlans.includes('plan_b') && (
                               <div className="absolute right-1 top-1/2 -translate-y-1/2">
                                 <button 
