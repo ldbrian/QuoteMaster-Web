@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { trackEvent } from '@/src/utils/analytics'; // 确保路径正确
+import { trackEvent } from '@/src/utils/analytics'; 
 
 interface QuoteFeedbackProps {
   inquiryId: string;
@@ -8,31 +8,51 @@ interface QuoteFeedbackProps {
 
 export default function QuoteFeedback({ inquiryId, category }: QuoteFeedbackProps) {
   const [feedback, setFeedback] = useState<'none' | 'up' | 'down'>('none');
-  const [isVisible, setIsVisible] = useState(true); // 🌟 新增：控制是否挂载
+  
+  // 🌟 初始状态设为 true (先藏起来)，避免页面刚加载时闪烁
+  const [isHidden, setIsHidden] = useState(true); 
+  const [hasChecked, setHasChecked] = useState(false); // 记录是否已经查过本地缓存
+
+  // 🌟 新增：组件挂载时，去本地查一下有没有评价过这个 ID
+  useEffect(() => {
+    const ratedItems = JSON.parse(localStorage.getItem('rated_quotes') || '[]');
+    if (!ratedItems.includes(inquiryId)) {
+      setIsHidden(false); // 如果没评价过，才把它显示出来
+    }
+    setHasChecked(true);
+  }, [inquiryId]);
 
   const handleRate = (type: 'up' | 'down') => {
     if (feedback !== 'none') return;
     setFeedback(type);
     
+    // 1. 发送埋点到服务器
     trackEvent('quote_feedback', {
       inquiry_id: inquiryId,
       category: category,
       rating: type === 'up' ? 'accurate' : 'inaccurate'
     });
 
-    // 🌟 1.5秒后自动销毁组件
+    // 🌟 2. 把这个 ID 记入小本本 (localStorage)
+    const ratedItems = JSON.parse(localStorage.getItem('rated_quotes') || '[]');
+    if (!ratedItems.includes(inquiryId)) {
+      ratedItems.push(inquiryId);
+      localStorage.setItem('rated_quotes', JSON.stringify(ratedItems));
+    }
+
+    // 3. 延迟 1.5 秒后自动隐藏组件
     setTimeout(() => {
-      setIsVisible(false);
+      setIsHidden(true);
     }, 1500);
   };
 
-  // 如果状态变为不可见，直接不渲染
-  if (!isVisible) return null;
+  // 如果还没查完缓存，或者已经被标记为隐藏，直接不渲染
+  if (!hasChecked || isHidden) return null;
 
   return (
     <div className={`mt-2 flex flex-col sm:flex-row items-center justify-between text-sm transition-opacity duration-500 ${feedback !== 'none' ? 'opacity-80' : 'opacity-100'}`}>
       <span className="mb-3 sm:mb-0 text-slate-500 font-medium mr-6">
-        {feedback === 'none' ? '这个核价结果准吗？您的反馈将帮助 AI 持续进化' : '感谢您的反馈！正在为您优化模型...'}
+        {feedback === 'none' ? '这个核价结果准吗？您的反馈将帮助 AI 持续进化' : '✅ 感谢反馈！正在为您优化模型...'}
       </span>
       
       <div className="flex gap-3">
