@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // 绝对禁止在此处保留 url = env(...)
+}
+
+enum BusinessState {
+  NEW_INQUIRY
+  REQUIREMENT
+  NEED_QUOTE
+  NEGOTIATION
+  SAMPLING
+  CLOSING
+  DORMANT
+}
+
+enum AttentionState {
+  ACTION_NEEDED
+  FOLLOW_UP
+  WAITING
+  COMPLETED
+}
+
+model BusinessThread {
+  id                   String           @id @default(uuid()) @db.Uuid
+  title                String
+  business_state       BusinessState    @default(NEW_INQUIRY)
+  attention_state      AttentionState   @default(ACTION_NEEDED)
+  company_name         String?
+  country              String?
+  source_email         String?
+  email_domain         String?
+  identity_cluster_key String?
+  related_thread_id    String?          @db.Uuid
+  context              Json?
+  context_updated_at   DateTime?
+  last_active_at       DateTime         @default(now())
+  created_at           DateTime         @default(now())
+  updated_at           DateTime         @updatedAt
+
+  related_thread       BusinessThread?  @relation("ThreadIdentityLinks", fields: [related_thread_id], references: [id])
+  linked_threads       BusinessThread[] @relation("ThreadIdentityLinks")
+  communications       Communication[]
+  quotes               Quote[]
+
+  @@index([business_state])
+  @@index([attention_state])
+  @@index([last_active_at])
+  @@index([source_email])
+  @@index([email_domain])
+  @@index([identity_cluster_key])
+  @@index([related_thread_id])
+}
+
+model Communication {
+  id                String         @id @default(uuid()) @db.Uuid
+  thread_id         String         @db.Uuid
+  source            String
+  message_body      String
+  is_from_customer  Boolean
+  timestamp         DateTime
+  extracted_signals Json?
+  created_at        DateTime       @default(now())
+
+  thread            BusinessThread @relation(fields: [thread_id], references: [id])
+
+  @@index([thread_id])
+  @@index([timestamp])
+}
+
+model Quote {
+  id         String         @id @default(uuid()) @db.Uuid
+  thread_id  String         @db.Uuid
+  parameters Json
+  status     String
+  created_at DateTime       @default(now())
+  updated_at DateTime       @updatedAt
+
+  thread     BusinessThread @relation(fields: [thread_id], references: [id])
+
+  @@index([thread_id])
+  @@index([status])
+}

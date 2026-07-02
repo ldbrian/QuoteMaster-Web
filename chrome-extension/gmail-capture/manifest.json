@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "QuoteMaster Gmail Capture",
+  "version": "0.1.0",
+  "description": "Silently captures the latest Gmail message content for QuoteMaster thread matching.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://mail.google.com/mail/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Capture Gmail Message"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/mail/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

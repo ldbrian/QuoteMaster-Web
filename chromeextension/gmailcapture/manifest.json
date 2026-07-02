@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "QuoteMaster Web Capture",
+  "version": "0.2.0",
+  "description": "Silently captures message bodies from webmail and WhatsApp Web for QuoteMaster thread matching.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "QuoteMaster Sync"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content_script.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": true
+    }
+  ]
+}
