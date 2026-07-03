@@ -15,8 +15,9 @@ export function OnboardingGuideModal({
   if (!open) return null;
 
   const steps = [
+    "下载插件压缩包，并解压到一个固定文件夹。",
     "打开 Chrome 扩展管理页，开启开发者模式。",
-    "选择加载已解压的扩展程序，目录选择 chromeextension/gmailcapture。",
+    "选择加载已解压的扩展程序，目录选择刚才解压出来的 gmailcapture 文件夹。",
     "回到 QuoteMaster 登录账号，进入业务线程页面完成账号绑定。",
     "打开 Gmail、163 邮箱或其他网页邮箱，进入具体邮件详情页后等待自动捕获。",
     "微信、电话纪要或其他渠道，使用右上角的手动录入。",
@@ -41,6 +42,24 @@ export function OnboardingGuideModal({
         </div>
 
         <div className="px-6 py-6">
+          <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-950">QuoteMaster 捕获插件</p>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  下载后先解压，再在 Chrome 扩展管理页加载解压后的文件夹。
+                </p>
+              </div>
+              <a
+                href="/downloads/quotemaster-gmailcapture.zip"
+                download
+                className="inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+              >
+                下载插件压缩包
+              </a>
+            </div>
+          </div>
+
           <div className="space-y-3">
             {steps.map((step, index) => (
               <div key={step} className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
