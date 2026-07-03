@@ -11,7 +11,8 @@
   "host_permissions": [
     "<all_urls>",
     "http://localhost:3000/*",
-    "http://127.0.0.1:3000/*"
+    "http://127.0.0.1:3000/*",
+    "https://*.vercel.app/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -31,5 +32,12 @@
       "all_frames": true,
       "match_about_blank": true
     }
-  ]
+  ],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:3000/*",
+      "http://127.0.0.1:3000/*",
+      "https://*.vercel.app/*"
+    ]
+  }
 }

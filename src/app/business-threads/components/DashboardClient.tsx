@@ -1,15 +1,20 @@
 ﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/src/utils/supabase/client";
+import { ManualCaptureModal, OnboardingGuideModal } from "./ThreadCaptureModals";
 import type { AttentionState, BusinessState } from "@prisma/client";
 import {
   AlertCircle,
   Archive,
   ChevronDown,
+  ClipboardPaste,
   Circle,
   Clock3,
   FileText,
+  HelpCircle,
   Inbox,
   Radio,
   Send,
@@ -570,18 +575,101 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("ALL");
   const [threads, setThreads] = useState(initialThreads);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [isLoadingThreads, setIsLoadingThreads] = useState(true);
+  const [isManualOpen, setIsManualOpen] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const router = useRouter();
 
   const visibleThreads = useMemo(() => {
     if (activeFilter === "ALL") return threads;
     return threads.filter((thread) => thread.attention_state === activeFilter);
   }, [activeFilter, threads]);
 
-  async function archiveThread(threadId: string) {
-    const previousThreads = threads;
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadThreadsForCurrentUser() {
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
+
+      if (!session) {
+        router.push("/login");
+        return;
+      }
+
+      if (!isMounted) return;
+      setAuthToken(session.access_token);
+      window.postMessage(
+        {
+          source: "QUOTEMASTER_WEB_AUTH",
+          type: "QUOTEMASTER_SET_AUTH",
+          payload: {
+            access_token: session.access_token,
+            user_id: session.user.id,
+            email: session.user.email,
+          },
+        },
+        window.location.origin
+      );
+
+      try {
+        const response = await fetch("/api/business-threads", {
+          headers: { Authorization: "Bearer " + session.access_token },
+        });
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok || result?.success === false) {
+          throw new Error(result?.error || "业务线程加载失败");
+        }
+
+        if (isMounted) setThreads(result.data || []);
+      } catch (error) {
+        console.error("Load business threads failed:", error);
+      } finally {
+        if (isMounted) setIsLoadingThreads(false);
+      }
+    }
+
+    loadThreadsForCurrentUser();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        setAuthToken(null);
+        setThreads([]);
+        router.push("/login");
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [router]);
+
+  async function reloadThreads(token = authToken) {
+    if (!token) return;
+
+    const response = await fetch("/api/business-threads", {
+      headers: { Authorization: "Bearer " + token },
+    });
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.error || "业务线程加载失败");
+    }
+
+    setThreads(result.data || []);
+  }
+
+  async function archiveThread(threadId: string) {    const previousThreads = threads;
     setThreads((current) => current.filter((thread) => thread.id !== threadId));
 
     try {
-      const response = await fetch(`/api/threads/${threadId}/archive`, { method: "PATCH" });
+      const response = await fetch(`/api/threads/${threadId}/archive`, {
+        method: "PATCH",
+        headers: authToken ? { Authorization: "Bearer " + authToken } : undefined,
+      });
       const data = await response.json().catch(() => null);
 
       if (!response.ok || data?.success === false) {
@@ -611,7 +699,10 @@ export default function DashboardClient({
     try {
       const response = await fetch(`/api/threads/${threadId}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: "Bearer " + authToken } : {}),
+        },
         body: JSON.stringify({ attention_state: attentionState }),
       });
       const data = await response.json().catch(() => null);
@@ -641,6 +732,25 @@ export default function DashboardClient({
               AI 不只是理解沟通，而是帮助你推进每一笔正在发生的业务。
             </p>
           </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsGuideOpen(true)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
+            >
+              <HelpCircle size={16} />
+              新手指引
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsManualOpen(true)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
+            >
+              <ClipboardPaste size={16} />
+              手动录入
+            </button>
+          </div>
         </header>
 
         <TodayBrief threads={threads} visibleCount={visibleThreads.length} totalCount={threads.length} />
@@ -651,7 +761,11 @@ export default function DashboardClient({
           threads={threads}
         />
 
-        {loadError ? (
+        {isLoadingThreads ? (
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm font-medium text-slate-500 shadow-sm">
+            正在加载你的业务线程...
+          </div>
+        ) : loadError ? (
           <ErrorState message={loadError} />
         ) : visibleThreads.length > 0 ? (
           <div className="space-y-4">
@@ -668,6 +782,14 @@ export default function DashboardClient({
           <EmptyState />
         )}
       </section>
+
+      <ManualCaptureModal
+        open={isManualOpen}
+        authToken={authToken}
+        onClose={() => setIsManualOpen(false)}
+        onSuccess={() => reloadThreads()}
+      />
+      <OnboardingGuideModal open={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
     </main>
   );
 }

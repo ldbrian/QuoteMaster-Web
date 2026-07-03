@@ -2,11 +2,12 @@
 import { Prisma } from "@prisma/client";
 import OpenAI from "openai";
 import { prisma } from "@/src/utils/prisma";
+import { requireAuthenticatedUser } from "@/src/utils/auth/server";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
@@ -256,12 +257,13 @@ function buildIdentityClusterKey(sourceEmail: string, companyName?: string | nul
 
   return normalizedCompany ? `${domain}::${normalizedCompany}` : domain;
 }
-async function findExistingCommunicationByHash(messageHash?: string) {
+async function findExistingCommunicationByHash(messageHash: string | undefined, ownerUserId: string) {
   const normalizedHash = typeof messageHash === "string" ? messageHash.trim() : "";
   if (!normalizedHash) return null;
 
   return prisma.communication.findFirst({
     where: {
+      thread: { owner_user_id: ownerUserId },
       extracted_signals: {
         path: ["message_hash"],
         equals: normalizedHash,
@@ -275,6 +277,7 @@ async function findExistingCommunicationByHash(messageHash?: string) {
 }
 
 async function createThreadFromContext(
+  ownerUserId: string,
   sourceEmail: string,
   context: AdvancementContext,
   db: Prisma.TransactionClient | typeof prisma,
@@ -294,6 +297,7 @@ async function createThreadFromContext(
   const createdThread = await db.businessThread.create({
     data: {
       title: sanitizeThreadTitle(options?.title || context.current_intent || context.current_need || undefined),
+      owner_user_id: ownerUserId,
       business_state: businessState,
       attention_state: attentionState,
       company_name: context.company_name,
@@ -326,6 +330,7 @@ async function createThreadFromContext(
 }
 
 async function resolveThreadByIdentity(
+  ownerUserId: string,
   sourceEmail: string,
   messageBody: string,
   db: Prisma.TransactionClient | typeof prisma = prisma
@@ -339,6 +344,7 @@ async function resolveThreadByIdentity(
         business_state: {
           in: [...ACTIVE_BUSINESS_STATES],
         },
+        owner_user_id: ownerUserId,
         OR: [{ source_email: normalizedSourceEmail }, { email_domain: emailDomain }],
       },
       select: {
@@ -440,14 +446,14 @@ async function resolveThreadByIdentity(
 
     const rawContent = completion.choices[0]?.message?.content;
     if (!rawContent) {
-      return createThreadFromContext(sourceEmail, normalizeAdvancementContext(sourceEmail, null), db);
+      return createThreadFromContext(ownerUserId, sourceEmail, normalizeAdvancementContext(sourceEmail, null), db);
     }
 
     let decision: IdentityResolutionDecision;
     try {
       decision = JSON.parse(rawContent) as IdentityResolutionDecision;
     } catch {
-      return createThreadFromContext(sourceEmail, normalizeAdvancementContext(sourceEmail, null), db);
+      return createThreadFromContext(ownerUserId, sourceEmail, normalizeAdvancementContext(sourceEmail, null), db);
     }
 
     if (decision.is_valid_b2b_inquiry === false) {
@@ -475,6 +481,7 @@ async function resolveThreadByIdentity(
       const matchedThread = await db.businessThread.findFirst({
         where: {
           id: matchedThreadId,
+          owner_user_id: ownerUserId,
           OR: [{ source_email: normalizedSourceEmail }, { email_domain: emailDomain }],
         },
         select: {
@@ -484,9 +491,10 @@ async function resolveThreadByIdentity(
       });
 
       if (matchedThread) {
-        await db.businessThread.update({
+        await db.businessThread.updateMany({
           where: {
             id: matchedThread.id,
+            owner_user_id: ownerUserId,
           },
           data: {
             company_name: context.company_name,
@@ -515,7 +523,7 @@ async function resolveThreadByIdentity(
     }
 
     const latestRelatedThread = candidateThreads[0]?.id || null;
-    return createThreadFromContext(sourceEmail, context, db, {
+    return createThreadFromContext(ownerUserId, sourceEmail, context, db, {
       title: decision.thread_decision?.recommended_title,
       business_state: businessState,
       attention_state: attentionState,
@@ -524,12 +532,19 @@ async function resolveThreadByIdentity(
     });
   } catch (error) {
     console.error("resolveThreadByIdentity failed:", error);
-    return createThreadFromContext(sourceEmail, normalizeAdvancementContext(sourceEmail, null), db);
+    return createThreadFromContext(ownerUserId, sourceEmail, normalizeAdvancementContext(sourceEmail, null), db);
   }
 }
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuthenticatedUser(req);
+
+    if (!auth.user) {
+      return jsonResponse({ success: false, error: auth.error || "Unauthorized" }, { status: 401 });
+    }
+
+    const ownerUserId = auth.user.id;
     const payload = (await req.json()) as IngestCommunicationPayload;
     const sourceEmail = payload.source_email?.trim();
     const messageBody = payload.message_body?.trim();
@@ -543,7 +558,7 @@ export async function POST(req: Request) {
       return jsonResponse({ success: false, error: "message_body is required" }, { status: 400 });
     }
 
-    const existingCommunication = await findExistingCommunicationByHash(payload.message_hash);
+    const existingCommunication = await findExistingCommunicationByHash(payload.message_hash, ownerUserId);
     if (existingCommunication) {
       return jsonResponse({
         success: true,
@@ -555,7 +570,7 @@ export async function POST(req: Request) {
     }
 
     const messageTimestamp = parseIncomingTimestamp(payload.timestamp);
-    const resolution = await resolveThreadByIdentity(sourceEmail, messageBody, prisma);
+    const resolution = await resolveThreadByIdentity(ownerUserId, sourceEmail, messageBody, prisma);
 
     if (resolution.ignored) {
       return jsonResponse({
@@ -574,6 +589,7 @@ export async function POST(req: Request) {
           is_from_customer: true,
           timestamp: messageTimestamp,
           extracted_signals: {
+            owner_user_id: ownerUserId,
             source_email: normalizeEmail(sourceEmail),
             email_domain: extractEmailDomain(sourceEmail),
             title: payload.title || null,
@@ -588,9 +604,10 @@ export async function POST(req: Request) {
         },
       });
 
-      const thread = await tx.businessThread.update({
+      const updatedThread = await tx.businessThread.updateMany({
         where: {
           id: resolution.thread_id,
+          owner_user_id: ownerUserId,
         },
         data: {
           company_name: resolution.context.company_name,
@@ -604,6 +621,14 @@ export async function POST(req: Request) {
           context_updated_at: messageTimestamp,
           last_active_at: messageTimestamp,
         },
+      });
+
+      if (updatedThread.count !== 1) {
+        throw new Error("Thread ownership check failed");
+      }
+
+      const thread = await tx.businessThread.findUniqueOrThrow({
+        where: { id: resolution.thread_id },
       });
 
       return {

@@ -12,6 +12,24 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
 
+  const syncQuoteMasterExtensionAuth = (session: any) => {
+    if (!session?.access_token || !session?.user?.id) return;
+
+    window.postMessage(
+      {
+        source: 'QUOTEMASTER_WEB_AUTH',
+        type: 'QUOTEMASTER_SET_AUTH',
+        payload: {
+          access_token: session.access_token,
+          user_id: session.user.id,
+          email: session.user.email,
+          api_base_url: window.location.origin,
+        },
+      },
+      window.location.origin
+    );
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -22,9 +40,10 @@ export default function LoginPage() {
         alert('🎉 注册成功！请查收您的邮箱进行验证，或直接尝试登录。');
         setIsSignUp(false);
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        router.push('/dashboard'); // 登录成功，跳转回 Dashboard
+        syncQuoteMasterExtensionAuth(data.session);
+        router.push('/business-threads'); // 登录成功，跳转回 Dashboard
       }
     } catch (error: any) {
       alert(error.message || '登录/注册失败，请检查账号密码后重试');
@@ -37,7 +56,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: `${window.location.origin}/business-threads`,
       }
     });
     if (error) alert('Google 登录失败: ' + error.message);

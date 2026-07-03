@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/src/utils/prisma";
+import { requireAuthenticatedUser } from "@/src/utils/auth/server";
 
 type AttentionStateValue = "ACTION_NEEDED" | "FOLLOW_UP" | "WAITING" | "COMPLETED";
 type BusinessStateValue =
@@ -34,6 +35,12 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
+    const auth = await requireAuthenticatedUser(req);
+
+    if (!auth.user) {
+      return NextResponse.json({ success: false, error: auth.error || "Unauthorized" }, { status: 401 });
+    }
+
     const params = await context.params;
     const threadId = params.id;
     const payload = (await req.json().catch(() => ({}))) as {
@@ -67,9 +74,17 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: "No status fields provided" }, { status: 400 });
     }
 
-    const thread = await prisma.businessThread.update({
-      where: { id: threadId },
+    const updated = await prisma.businessThread.updateMany({
+      where: { id: threadId, owner_user_id: auth.user.id },
       data,
+    });
+
+    if (updated.count !== 1) {
+      return NextResponse.json({ success: false, error: "Thread not found" }, { status: 404 });
+    }
+
+    const thread = await prisma.businessThread.findFirst({
+      where: { id: threadId, owner_user_id: auth.user.id },
       select: {
         id: true,
         business_state: true,
@@ -79,7 +94,7 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({ success: true, thread_id: thread.id, data: thread });
+    return NextResponse.json({ success: true, thread_id: threadId, data: thread });
   } catch (error) {
     console.error("PATCH /api/threads/[id]/status failed:", error);
 

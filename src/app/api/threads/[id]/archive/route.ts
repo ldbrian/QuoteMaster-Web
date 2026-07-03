@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/src/utils/prisma";
+import { requireAuthenticatedUser } from "@/src/utils/auth/server";
 
 export async function PATCH(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
+    const auth = await requireAuthenticatedUser(req);
+
+    if (!auth.user) {
+      return NextResponse.json({ success: false, error: auth.error || "Unauthorized" }, { status: 401 });
+    }
+
     const params = await context.params;
     const threadId = params.id;
 
@@ -14,20 +21,19 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: "thread_id is required" }, { status: 400 });
     }
 
-    const thread = await prisma.businessThread.update({
-      where: { id: threadId },
+    const updated = await prisma.businessThread.updateMany({
+      where: { id: threadId, owner_user_id: auth.user.id },
       data: {
         business_state: "DORMANT",
         attention_state: "COMPLETED",
       },
-      select: {
-        id: true,
-        business_state: true,
-        attention_state: true,
-      },
     });
 
-    return NextResponse.json({ success: true, thread_id: thread.id, data: thread });
+    if (updated.count !== 1) {
+      return NextResponse.json({ success: false, error: "Thread not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, thread_id: threadId });
   } catch (error) {
     console.error("PATCH /api/threads/[id]/archive failed:", error);
 

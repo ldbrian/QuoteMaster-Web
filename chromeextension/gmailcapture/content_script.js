@@ -1,5 +1,6 @@
 (() => {
   const GLOBAL_KEY = "__QUOTEMASTER_CAPTURE_STATE__";
+  const SCRIPT_VERSION = "2026-07-03-163-null-safe-v2";
   const BACKGROUND_EVENT = "QUOTEMASTER_CAPTURE_READY";
   const FORCE_SYNC_EVENT = "QUOTEMASTER_FORCE_SYNC";
   const STORAGE_LAST_HASH_KEY = "quotemaster_last_sent_hash";
@@ -8,12 +9,23 @@
   const DEBOUNCE_MS = 850;
   const IS_TOP_FRAME = window.top === window;
 
-  if (window[GLOBAL_KEY]?.scanNow) {
-    window[GLOBAL_KEY].scanNow("reinject");
+  if (window[GLOBAL_KEY]?.version === SCRIPT_VERSION && window[GLOBAL_KEY]?.scanNow) {
+    Promise.resolve(window[GLOBAL_KEY].scanNow("reinject")).catch((error) => {
+      console.warn("[QuoteMaster] reinject scan failed:", error);
+    });
     return;
   }
 
+  if (window[GLOBAL_KEY]?.cleanup) {
+    try {
+      window[GLOBAL_KEY].cleanup();
+    } catch (error) {
+      console.warn("[QuoteMaster] previous capture cleanup failed:", error);
+    }
+  }
+
   let debounceTimer = null;
+  let mutationObserver = null;
   let panel = null;
   let lastSeenHash = "";
   let lastDeliveredHash = "";
@@ -106,9 +118,15 @@
       </div>
     `;
 
-    panel.querySelector("[data-qm-sync]").addEventListener("click", () => {
-      scanNow("manual-ui");
-    });
+    const syncButton = panel.querySelector("[data-qm-sync]");
+    if (syncButton) {
+      syncButton.addEventListener("click", () => {
+        scanNow("manual-ui").catch((error) => {
+          console.warn("[QuoteMaster] manual dock sync failed:", error);
+          setPanelState("error", "同步失败：请刷新页面后重试");
+        });
+      });
+    }
 
     document.documentElement.appendChild(panel);
     return panel;
@@ -129,12 +147,20 @@
       error: { dot: "#ef4444", text: detail || "同步失败" },
     };
 
+    if (!dot || !status) return;
+
     const preset = presets[state] || presets.idle;
     dot.style.background = preset.dot;
     status.textContent = preset.text;
   }
 
+  function isKnownNonConversationPage() {
+    const text = `${document.title || ""} ${location.hostname} ${location.pathname} ${location.hash}`.toLowerCase();
+    return /module=welcome|welcomemodule|welcome\.|mail163_letter#module=welcome|#module=welcome/.test(text);
+  }
+
   function hasMailUrlSignal() {
+    if (isKnownNonConversationPage()) return false;
     const text = `${document.title || ""} ${location.hostname} ${location.pathname} ${location.hash}`.toLowerCase();
     return /mail|gmail|outlook|webmail|inbox|message|conversation|163\.com|126\.com|yeah\.net|qq\.com|exmail|aliyun|whatsapp|chat/.test(text);
   }
@@ -187,6 +213,7 @@
   }
 
   function isLikelyConversationPage() {
+    if (isKnownNonConversationPage()) return false;
     return hasMailUrlSignal() || hasMailHeaderSignal() || hasKnownMessageContainer();
   }
 
@@ -626,8 +653,10 @@
 
   function setPanelState(state, detail) {
     const node = createMiniPanel();
+    if (!node) return;
     const dot = node.querySelector('[data-qm-dot]');
     const status = node.querySelector('[data-qm-status]');
+    if (!dot || !status) return;
 
     const palette = {
       idle: ['#64748b', '自动监听中'],
@@ -643,18 +672,72 @@
     status.textContent = text;
   }
 
+  function hasChromeStorage() {
+    return typeof chrome !== 'undefined' && Boolean(chrome.storage && chrome.storage.local);
+  }
+
+  function readLocalFallback(key) {
+    try {
+      return window.localStorage.getItem(key) || '';
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  function writeLocalFallback(key, value) {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (_error) {
+      // Some pages block localStorage. In-memory dedupe still protects this tab.
+    }
+  }
   async function readLastDeliveredHash() {
-    const result = await chrome.storage.local.get([STORAGE_LAST_HASH_KEY]);
-    return result?.[STORAGE_LAST_HASH_KEY] || '';
-  }
+    if (!hasChromeStorage()) {
+      return lastDeliveredHash || readLocalFallback(STORAGE_LAST_HASH_KEY);
+    }
 
+    try {
+      const result = await chrome.storage.local.get([STORAGE_LAST_HASH_KEY]);
+      return result?.[STORAGE_LAST_HASH_KEY] || '';
+    } catch (error) {
+      console.warn('[QuoteMaster] chrome.storage.local unavailable, using fallback cache:', error);
+      return lastDeliveredHash || readLocalFallback(STORAGE_LAST_HASH_KEY);
+    }
+  }
   async function writeLastDeliveredState(hash, payload) {
-    await chrome.storage.local.set({
-      [STORAGE_LAST_HASH_KEY]: hash,
-      [STORAGE_LAST_PAYLOAD_KEY]: payload,
-    });
-  }
+    lastDeliveredHash = hash || lastDeliveredHash;
 
+    if (!hasChromeStorage()) {
+      writeLocalFallback(STORAGE_LAST_HASH_KEY, hash || '');
+      writeLocalFallback(STORAGE_LAST_PAYLOAD_KEY, JSON.stringify(payload || {}));
+      return;
+    }
+
+    try {
+      await chrome.storage.local.set({
+        [STORAGE_LAST_HASH_KEY]: hash,
+        [STORAGE_LAST_PAYLOAD_KEY]: payload,
+      });
+    } catch (error) {
+      console.warn('[QuoteMaster] failed to write chrome.storage.local, using fallback cache:', error);
+      writeLocalFallback(STORAGE_LAST_HASH_KEY, hash || '');
+      writeLocalFallback(STORAGE_LAST_PAYLOAD_KEY, JSON.stringify(payload || {}));
+    }
+  }
+  function compactSyncError(message) {
+    const text = normalizeText(message || '');
+    if (!text) return '\u540c\u6b65\u5931\u8d25';
+    if (/Missing QuoteMaster auth token|Authorization|Unauthorized|auth token|Bearer/i.test(text) || text.includes('\u672a\u8fde\u63a5 QuoteMaster \u8d26\u53f7')) {
+      return '\u672a\u8fde\u63a5\u8d26\u53f7\uff1a\u8bf7\u5148\u6253\u5f00 QuoteMaster \u767b\u5f55\uff0c\u518d\u5237\u65b0\u90ae\u7bb1\u9875\u9762\u3002';
+    }
+    if (/Failed to fetch|NetworkError|Load failed/i.test(text) || text.includes('\u65e0\u6cd5\u8fde\u63a5\u672c\u5730\u540e\u7aef')) {
+      return '\u65e0\u6cd5\u8fde\u63a5\u540e\u7aef\uff1a\u8bf7\u786e\u8ba4 npm run dev \u6b63\u5728\u8fd0\u884c\u3002';
+    }
+    if (text.includes('http://127.0.0.1:3000/api/ingest/communication') || text.includes('http://localhost:3000/api/ingest/communication')) {
+      return '\u540e\u7aef\u540c\u6b65\u5931\u8d25\uff1a\u8bf7\u67e5\u770b QuoteMaster \u7ec8\u7aef\u65e5\u5fd7\u3002';
+    }
+    return text.length > 84 ? text.slice(0, 84) + '...' : text;
+  }
   async function sendCapturedPayload(payload, captureMode) {
     if (!payload) {
       setPanelState('empty');
@@ -662,9 +745,9 @@
     }
 
     const deliveredHash = await readLastDeliveredHash();
-    if (payload.message_hash && payload.message_hash === deliveredHash) {
+    if (captureMode === 'auto' && payload.message_hash && payload.message_hash === deliveredHash) {
       lastDeliveredHash = deliveredHash;
-      setPanelState('duplicate', '内容已同步，无需重复发送');
+      setPanelState('duplicate', '\u5185\u5bb9\u5df2\u540c\u6b65\uff0c\u65e0\u9700\u91cd\u590d\u53d1\u9001');
       return {
         ok: true,
         skipped: true,
@@ -703,7 +786,7 @@
             return;
           }
 
-          setPanelState('error', response?.error || '后端未返回成功状态');
+          setPanelState('error', response?.display_error || compactSyncError(response?.error));
           resolve(response || { ok: false, error: 'Unknown response' });
         }
       );
@@ -792,25 +875,43 @@
     const target = document.body || document.documentElement;
     if (!target) return;
 
-    const observer = new MutationObserver((mutations) => {
+    if (mutationObserver) mutationObserver.disconnect();
+
+    mutationObserver = new MutationObserver((mutations) => {
       if (!shouldObserveMutations(mutations)) return;
       if (!isLikelyConversationPage()) return;
       scheduleScan();
     });
 
-    observer.observe(target, {
+    mutationObserver.observe(target, {
       childList: true,
       subtree: true,
       characterData: true,
     });
   }
 
+  window.addEventListener("message", (event) => {
+    if (event.source !== window) return;
+    if (event.data?.source !== "QUOTEMASTER_WEB_AUTH") return;
+    if (event.data?.type !== "QUOTEMASTER_SET_AUTH") return;
+
+    chrome.runtime.sendMessage({
+      type: "QUOTEMASTER_SET_AUTH",
+      payload: event.data.payload,
+    });
+  });
+
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type !== FORCE_SYNC_EVENT) return false;
 
-    scanNow('manual').then((result) => {
-      sendResponse({ ok: Boolean(result?.ok), payload: result?.payload || null, skipped: Boolean(result?.skipped) });
-    });
+    scanNow('manual')
+      .then((result) => {
+        sendResponse({ ok: Boolean(result?.ok), payload: result?.payload || null, skipped: Boolean(result?.skipped) });
+      })
+      .catch((error) => {
+        setPanelState('error', compactSyncError(error?.message || String(error)));
+        sendResponse({ ok: false, error: error?.message || String(error) });
+      });
 
     return true;
   });
@@ -823,11 +924,19 @@
   });
 
   if (IS_TOP_FRAME) createMiniPanel();
-  setPanelState('idle');
+  if (IS_TOP_FRAME) setPanelState('idle');
   mountObserver();
-  scheduleScan();
+  if (!isKnownNonConversationPage()) scheduleScan();
 
   window[GLOBAL_KEY] = {
+    version: SCRIPT_VERSION,
     scanNow,
+    cleanup() {
+      window.clearTimeout(debounceTimer);
+      if (mutationObserver) mutationObserver.disconnect();
+      mutationObserver = null;
+      if (panel?.parentNode) panel.parentNode.removeChild(panel);
+      panel = null;
+    },
   };
 })();
