@@ -608,6 +608,7 @@ export default function DashboardClient({
             access_token: session.access_token,
             user_id: session.user.id,
             email: session.user.email,
+            api_base_url: window.location.origin,
           },
         },
         window.location.origin

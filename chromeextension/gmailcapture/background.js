@@ -70,7 +70,7 @@ function normalizeApiBaseUrl(value) {
 async function buildApiUrls() {
   const auth = await readAuthState();
   const configuredBaseUrl = normalizeApiBaseUrl(auth?.api_base_url);
-  const baseUrls = configuredBaseUrl ? [configuredBaseUrl, ...LOCAL_API_BASE_URLS] : LOCAL_API_BASE_URLS;
+  const baseUrls = configuredBaseUrl ? [configuredBaseUrl] : LOCAL_API_BASE_URLS;
   return [...new Set(baseUrls)].map((baseUrl) => baseUrl + '/api/ingest/communication');
 }
 async function buildAuthHeaders() {
@@ -81,7 +81,7 @@ async function buildAuthHeaders() {
 function getFriendlyNetworkError(error) {
   const message = error instanceof Error ? error.message : String(error || '');
   if (/Failed to fetch|NetworkError|Load failed/i.test(message)) {
-    return '\u65e0\u6cd5\u8fde\u63a5 QuoteMaster \u540e\u7aef\uff1a\u8bf7\u786e\u8ba4\u5df2\u767b\u5f55\u7ebf\u4e0a\u7cfb\u7edf\uff0c\u6216\u672c\u5730 npm run dev \u6b63\u5728\u8fd0\u884c\u3002';
+    return '\u65e0\u6cd5\u8fde\u63a5\u5f53\u524d QuoteMaster \u540e\u7aef\uff1a\u8bf7\u91cd\u65b0\u6253\u5f00 QuoteMaster \u5e76\u767b\u5f55\uff0c\u7136\u540e\u5237\u65b0\u90ae\u7bb1\u9875\u9762\u3002';
   }
   return message || '\u8bf7\u6c42\u540e\u7aef\u5931\u8d25';
 }
