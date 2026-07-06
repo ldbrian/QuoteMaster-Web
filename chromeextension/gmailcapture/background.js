@@ -87,11 +87,13 @@ function getFriendlyNetworkError(error) {
 }
 function getFriendlyApiError(status, data) {
   const rawError = data?.error || '';
+  const code = data?.code ? ' [' + data.code + ']' : '';
+  const detail = data?.detail ? ': ' + data.detail : rawError ? ': ' + rawError : '';
   if (status === 401 || /authorization|unauthorized|auth token|bearer/i.test(rawError)) {
     return '\u672a\u8fde\u63a5 QuoteMaster \u8d26\u53f7\uff1a\u8bf7\u6253\u5f00 QuoteMaster \u767b\u5f55\uff0c\u7136\u540e\u5237\u65b0\u5f53\u524d\u90ae\u7bb1\u9875\u9762\u3002';
   }
   if (status === 404) return '\u540e\u7aef\u63a5\u53e3\u4e0d\u5b58\u5728\uff1a\u8bf7\u786e\u8ba4\u5f53\u524d\u9879\u76ee\u4ee3\u7801\u5df2\u66f4\u65b0\u5e76\u91cd\u542f\u3002';
-  if (status >= 500) return '\u540e\u7aef\u5904\u7406\u5931\u8d25\uff1a\u8bf7\u67e5\u770b Vercel \u6216\u672c\u5730\u7ec8\u7aef\u65e5\u5fd7\u3002';
+  if (status >= 500) return '\u540e\u7aef\u5904\u7406\u5931\u8d25' + code + detail;
   return rawError || '\u8bf7\u6c42\u5931\u8d25\uff0c\u72b6\u6001\u7801 ' + status;
 }
 async function postJson(url, payload) {

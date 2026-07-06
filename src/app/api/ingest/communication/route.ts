@@ -654,7 +654,12 @@ export async function POST(req: Request) {
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       return jsonResponse(
-        { success: false, error: "Database request failed", code: error.code },
+        {
+          success: false,
+          error: "Database request failed",
+          code: error.code,
+          detail: error.message,
+        },
         { status: 500 }
       );
     }
