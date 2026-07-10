@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "QuoteMaster Web Capture",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Silently captures message bodies from webmail and WhatsApp Web for QuoteMaster thread matching.",
   "permissions": [
     "activeTab",
