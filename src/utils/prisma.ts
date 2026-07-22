@@ -5,31 +5,17 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
-function getConnectionString() {
-  const connectionString = process.env.DATABASE_URL;
-
-  if (!connectionString) {
-    throw new Error("DATABASE_URL is required for Prisma Client initialization.");
-  }
-
-  if (!connectionString.startsWith("postgresql://") && !connectionString.startsWith("postgres://")) {
-    throw new Error(
-      "DATABASE_URL must be a PostgreSQL connection string for PrismaPg. Use the Supabase Postgres connection string, not sqlite or NEXT_PUBLIC_SUPABASE_URL."
-    );
-  }
-
-  return connectionString;
-}
-
 function createPrismaClient() {
-  const adapter = new PrismaPg({
-    connectionString: getConnectionString(),
-  });
-
-  return new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  });
+  try {
+    const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+    return new PrismaClient({
+      adapter,
+      log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    });
+  } catch (e) {
+    console.error("PrismaPg adapter init error:", e);
+    throw e;
+  }
 }
 
 function getPrismaClient() {
