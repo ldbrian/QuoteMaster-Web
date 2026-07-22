@@ -39,30 +39,35 @@ export default function CompanyDnaPage() {
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    const res = await fetch("/api/company-profile", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    setProfile(data.profile);
-    if (data.profile) {
-      setEditing({
-        companyName: data.profile.companyName || "",
-        mainProducts: data.profile.mainProducts || "",
-        coreAdvantages: data.profile.coreAdvantages || "",
-        targetCustomerType: data.profile.targetCustomerType || "",
-        targetMarkets: data.profile.targetMarkets || "",
-        unsuitableClients: data.profile.unsuitableClients || "",
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch("/api/company-profile", {
+        headers: { Authorization: `Bearer ${token}` },
       });
-    } else {
-      setEditing({
-        companyName: "",
-        mainProducts: "",
-        coreAdvantages: "",
-        targetCustomerType: "",
-        targetMarkets: "",
-        unsuitableClients: "",
-      });
+      const data = await res.json();
+      setProfile(data.profile);
+      if (data.profile) {
+        setEditing({
+          companyName: data.profile.companyName || "",
+          mainProducts: data.profile.mainProducts || "",
+          coreAdvantages: data.profile.coreAdvantages || "",
+          targetCustomerType: data.profile.targetCustomerType || "",
+          targetMarkets: data.profile.targetMarkets || "",
+          unsuitableClients: data.profile.unsuitableClients || "",
+        });
+      } else {
+        setEditing({
+          companyName: "",
+          mainProducts: "",
+          coreAdvantages: "",
+          targetCustomerType: "",
+          targetMarkets: "",
+          unsuitableClients: "",
+        });
+      }
+    } catch {
+      // Silently fail, show empty form
     }
     setLoading(false);
   }, [user]);
@@ -83,21 +88,26 @@ export default function CompanyDnaPage() {
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    const res = await fetch("/api/company-profile", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(editing),
-    });
-    const data = await res.json();
-    setProfile(data.profile);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch("/api/company-profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(editing),
+      });
+      const data = await res.json();
+      setProfile(data.profile);
+      setEditMode(false);
+      setAiSuggestion("");
+      setAiReason("");
+    } catch {
+      // Silently fail
+    }
     setSaving(false);
-    setEditMode(false);
-    setAiSuggestion("");
-    setAiReason("");
   };
 
   const handleAskAI = () => {

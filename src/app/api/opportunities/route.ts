@@ -77,6 +77,9 @@ export async function POST(req: Request) {
       risks: analysis.risks,
       insight: analysis.insight,
       summary: analysis.summary,
+      confidenceScore: analysis.confidenceScore,
+      confidenceReason: analysis.confidenceReason,
+      decisionAdvice: analysis.decisionAdvice,
       rawAnalysis: analysis,
     },
   });

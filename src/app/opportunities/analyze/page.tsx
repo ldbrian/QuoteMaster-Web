@@ -32,31 +32,35 @@ export default function AnalyzePage() {
     setError("");
     setAnalyzing(true);
 
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const res = await fetch("/api/opportunities", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          companyName: companyName.trim(),
+          website: website.trim() || undefined,
+          description: description.trim() || undefined,
+          additionalInfo: additionalInfo.trim() || undefined,
+        }),
+      });
 
-    const res = await fetch("/api/opportunities", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        companyName: companyName.trim(),
-        website: website.trim() || undefined,
-        description: description.trim() || undefined,
-        additionalInfo: additionalInfo.trim() || undefined,
-      }),
-    });
+      const data = await res.json();
 
-    const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "分析失败，请稍后重试");
+        setAnalyzing(false);
+        return;
+      }
 
-    if (!res.ok) {
-      setError(data.error || "分析失败，请稍后重试");
-      setAnalyzing(false);
-      return;
+      router.push(`/opportunities/${data.opportunity.id}`);
+    } catch {
+      setError("网络异常，请检查后重试");
     }
-
-    router.push(`/opportunities/${data.opportunity.id}`);
+    setAnalyzing(false);
   };
 
   if (authLoading) {

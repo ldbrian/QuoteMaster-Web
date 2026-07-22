@@ -13,6 +13,10 @@ import {
   Check,
   Sparkles,
   FileText,
+  Inbox,
+  User,
+  AtSign,
+  Calendar,
 } from "lucide-react";
 
 type EmailDraft = {
@@ -43,7 +47,9 @@ export default function OutreachPage({
   const [drafts, setDrafts] = useState<EmailDraft[]>([]);
   const [selectedDraft, setSelectedDraft] = useState<EmailDraft | null>(null);
   const [generating, setGenerating] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copiedSubject, setCopiedSubject] = useState(false);
+  const [copiedBody, setCopiedBody] = useState(false);
+  const [copiedFull, setCopiedFull] = useState(false);
   const [tone, setTone] = useState("professional");
   const [instructions, setInstructions] = useState("");
 
@@ -73,48 +79,48 @@ export default function OutreachPage({
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
+    if (!user) { router.replace("/login"); return; }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.access_token) fetchData(session.access_token);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session?.access_token) fetchData(sessionData.session.access_token);
+      } catch {}
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    })();
   }, [authLoading, user, id, router]);
 
   const handleGenerate = async () => {
     if (!user) return;
     setGenerating(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const res = await fetch(`/api/opportunities/${id}/outreach`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          tone: tone !== "professional" ? tone : undefined,
+          instructions: instructions.trim() || undefined,
+        }),
+      });
 
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    const res = await fetch(`/api/opportunities/${id}/outreach`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        tone: tone !== "professional" ? tone : undefined,
-        instructions: instructions.trim() || undefined,
-      }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      setSelectedDraft(data.draft);
-      setDrafts((prev) => [data.draft, ...prev]);
-    }
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedDraft(data.draft);
+        setDrafts((prev) => [data.draft, ...prev]);
+      }
+    } catch {}
     setGenerating(false);
   };
 
-  const handleCopy = async () => {
-    if (!selectedDraft) return;
-    const text = `Subject: ${selectedDraft.subject}\n\n${selectedDraft.body}`;
+  const copyToClipboard = async (text: string, target: "subject" | "body" | "full") => {
     await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (target === "subject") { setCopiedSubject(true); setTimeout(() => setCopiedSubject(false), 2000); }
+    if (target === "body") { setCopiedBody(true); setTimeout(() => setCopiedBody(false), 2000); }
+    if (target === "full") { setCopiedFull(true); setTimeout(() => setCopiedFull(false), 2000); }
   };
 
   useEffect(() => {
@@ -158,33 +164,30 @@ export default function OutreachPage({
         </div>
       </div>
 
-      <div className="space-y-4 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            语气
-          </label>
-          <select
-            value={tone}
-            onChange={(e) => setTone(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="professional">专业正式</option>
-            <option value="friendly">友好亲切</option>
-            <option value="price_focused">突出价格优势</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            额外指令（可选）
-          </label>
-          <input
-            type="text"
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
-            placeholder="例如：缩短到 100 词以内、强调认证资质..."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
+      <div className="space-y-4 mb-8">
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">语气</label>
+            <select
+              value={tone}
+              onChange={(e) => setTone(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="professional">专业正式</option>
+              <option value="friendly">友好亲切</option>
+              <option value="price_focused">突出价格优势</option>
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">额外指令</label>
+            <input
+              type="text"
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder="缩短到 100 词以内..."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
         </div>
 
         <button
@@ -197,7 +200,7 @@ export default function OutreachPage({
           ) : (
             <Sparkles className="w-4 h-4" />
           )}
-          生成开发信
+          {generating ? "AI 正在生成..." : "生成开发信"}
         </button>
       </div>
 
@@ -230,41 +233,66 @@ export default function OutreachPage({
 
       {selectedDraft && (
         <div className="space-y-6">
-          <div className="p-5 bg-white border border-gray-200 rounded-xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-500" />
-                <h2 className="font-semibold">邮件主题</h2>
+          {/* Inbox-style preview */}
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-gray-50 border-b border-gray-200 px-5 py-3 flex items-center gap-2">
+              <Inbox className="w-4 h-4 text-gray-400" />
+              <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">邮件预览</span>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="flex items-start gap-3 text-sm">
+                <AtSign className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-gray-400">收件人：</span>
+                  <span className="text-gray-700">{opportunity?.companyName || "客户"}</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 text-sm">
+                <FileText className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-gray-400">主题：</span>
+                  <span className="text-gray-900 font-medium">{selectedDraft.subject}</span>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(selectedDraft.subject, "subject")}
+                  className="shrink-0 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="复制主题"
+                >
+                  {copiedSubject ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <div className="flex items-start gap-3 text-sm">
+                <Calendar className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                <span className="text-gray-400">{new Date().toLocaleDateString("zh-CN")}</span>
               </div>
             </div>
-            <p className="text-gray-900 font-medium">
-              {selectedDraft.subject}
-            </p>
+
+            <div className="border-t border-gray-100 px-5 py-5">
+              <div className="text-gray-700 whitespace-pre-wrap leading-relaxed text-sm">
+                {selectedDraft.body}
+              </div>
+            </div>
           </div>
 
-          <div className="p-5 bg-white border border-gray-200 rounded-xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-500" />
-                <h2 className="font-semibold">邮件正文</h2>
-              </div>
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-green-500" /> 已复制
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" /> 复制
-                  </>
-                )}
-              </button>
+          {/* Copy actions */}
+          <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl">
+            <div className="text-sm text-gray-500 flex items-center gap-2">
+              <Copy className="w-4 h-4" />
+              <span>复制邮件</span>
             </div>
-            <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-              {selectedDraft.body}
+            <div className="flex gap-2">
+              <button
+                onClick={() => copyToClipboard(selectedDraft.body, "body")}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-200 bg-white rounded-lg hover:bg-gray-50"
+              >
+                {copiedBody ? <><Check className="w-3 h-3 text-green-500" /> 正文已复制</> : <><Copy className="w-3 h-3" /> 复制正文</>}
+              </button>
+              <button
+                onClick={() => copyToClipboard(`Subject: ${selectedDraft.subject}\n\n${selectedDraft.body}`, "full")}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                {copiedFull ? <><Check className="w-3 h-3" /> 全部已复制</> : <><Copy className="w-3 h-3" /> 复制全部</>}
+              </button>
             </div>
           </div>
 

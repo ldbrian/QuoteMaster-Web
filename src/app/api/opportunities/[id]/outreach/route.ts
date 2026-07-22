@@ -69,6 +69,9 @@ export async function POST(
       risks: opportunity.risks || "",
       insight: opportunity.insight || "",
       summary: opportunity.summary || "",
+      confidenceScore: opportunity.confidenceScore || 50,
+      confidenceReason: opportunity.confidenceReason || "",
+      decisionAdvice: opportunity.decisionAdvice || "",
     },
     { tone, instructions },
     user.id

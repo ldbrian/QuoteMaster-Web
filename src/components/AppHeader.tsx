@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/src/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, Target, MessageSquare, Building2, LogOut } from "lucide-react";
+import { LayoutDashboard, Target, MessageSquare, Building2, BarChart3, LogOut } from "lucide-react";
 
 export default function AppHeader() {
   const pathname = usePathname();
@@ -71,6 +71,17 @@ export default function AppHeader() {
           >
             <Building2 className="w-4 h-4" />
             公司资料
+          </Link>
+          <Link
+            href="/insights"
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+              isActive("/insights")
+                ? "bg-blue-50 text-blue-600"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            数据
           </Link>
           <button
             onClick={handleLogout}
