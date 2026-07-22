@@ -36,6 +36,7 @@ export default function CompanyDnaPage() {
   const [aiSuggestion, setAiSuggestion] = useState<string>("");
   const [aiReason, setAiReason] = useState<string>("");
   const [saveStatus, setSaveStatus] = useState<"success" | "error" | "">("");
+  const [saveErrorMsg, setSaveErrorMsg] = useState("");
 
   const fetchProfile = useCallback(async () => {
     if (!token) return;
@@ -64,11 +65,11 @@ export default function CompanyDnaPage() {
           unsuitableClients: "",
         });
       }
-    } catch {
-      // Silently fail, show empty form
+    } catch (e) {
+      console.error("Fetch profile error:", e);
     }
     setLoading(false);
-  }, [user]);
+  }, [token]);
 
   useEffect(() => {
     if (!authLoading) fetchProfile(); // eslint-disable-line
@@ -87,6 +88,7 @@ export default function CompanyDnaPage() {
     if (!token) return;
     setSaving(true);
     setSaveStatus("");
+    setSaveErrorMsg("");
     try {
       const res = await fetch("/api/company-profile", {
         method: "PUT",
@@ -97,15 +99,24 @@ export default function CompanyDnaPage() {
         body: JSON.stringify(editing),
       });
       const data = await res.json();
+      if (!res.ok) {
+        console.error("Save profile API error:", data);
+        setSaveStatus("error");
+        setSaveErrorMsg(res.status >= 500 ? "" : (data.error || ""));
+        setTimeout(() => { setSaveStatus(""); setSaveErrorMsg(""); }, 5000);
+        setSaving(false);
+        return;
+      }
       setProfile(data.profile);
       setEditMode(false);
       setAiSuggestion("");
       setAiReason("");
       setSaveStatus("success");
       setTimeout(() => setSaveStatus(""), 3000);
-    } catch {
+    } catch (e) {
+      console.error("Save profile network error:", e);
       setSaveStatus("error");
-      setTimeout(() => setSaveStatus(""), 5000);
+      setTimeout(() => { setSaveStatus(""); setSaveErrorMsg(""); }, 5000);
     }
     setSaving(false);
   };
@@ -226,7 +237,7 @@ export default function CompanyDnaPage() {
       )}
       {saveStatus === "error" && (
         <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4" /> 保存失败，请重试
+          <AlertCircle className="w-4 h-4 shrink-0" /> {saveErrorMsg || "保存失败，请重试"}
         </div>
       )}
 
