@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "@/src/utils/auth/server";
 import { prisma } from "@/src/utils/prisma";
 import { analyzeOpportunity } from "@/src/utils/ai/opportunity";
+import { researchService } from "@/src/research/service/research-service";
 
 export async function GET(req: Request) {
   try {
@@ -55,8 +56,12 @@ export async function POST(req: Request) {
       );
     }
 
+    const research = await researchService.research({
+      companyName, website, description, additionalInfo,
+    });
+
     const analysis = await analyzeOpportunity(
-      { companyName, website, description, additionalInfo },
+      research,
       {
         companyName: profile.companyName,
         mainProducts: profile.mainProducts,

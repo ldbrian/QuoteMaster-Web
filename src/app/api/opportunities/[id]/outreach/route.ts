@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "@/src/utils/auth/server";
 import { prisma } from "@/src/utils/prisma";
 import { generateOutreach } from "@/src/utils/ai/outreach";
+import { researchService } from "@/src/research/service/research-service";
 
 export async function GET(
   req: Request,
@@ -57,7 +58,15 @@ export async function POST(
     const body = await req.json().catch(() => ({}));
     const { tone, instructions } = body;
 
+    const research = await researchService.research({
+      companyName: opportunity.companyName,
+      website: opportunity.website || undefined,
+      description: opportunity.description || undefined,
+      additionalInfo: opportunity.additionalInfo || undefined,
+    });
+
     const result = await generateOutreach(
+      research,
       {
         companyName: profile.companyName,
         mainProducts: profile.mainProducts,
