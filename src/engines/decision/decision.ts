@@ -1,7 +1,7 @@
 import { callDeepSeek, cleanJsonResponse } from "@/src/utils/deepseek/client";
 import { prisma } from "@/src/utils/prisma";
-import type { CompanyDnaData } from "./company-dna";
-import type { ResearchResult } from "@/src/research/models/research-result";
+import type { CompanyDnaData } from "@/src/utils/ai/company-dna";
+import type { ResearchResult } from "@/src/engines/research/models/research-result";
 
 export type OpportunityAnalysis = {
   buyerProfile: string;

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "@/src/utils/auth/server";
 import { prisma } from "@/src/utils/prisma";
-import { analyzeOpportunity } from "@/src/utils/ai/opportunity";
-import { researchService } from "@/src/research/service/research-service";
+import { analyzeOpportunity } from "@/src/engines/decision/decision";
+import { researchService } from "@/src/engines/research/service/research-service";
 
 export async function GET(req: Request) {
   try {
@@ -91,6 +91,7 @@ export async function POST(req: Request) {
         confidenceReason: analysis.confidenceReason,
         decisionAdvice: analysis.decisionAdvice,
         rawAnalysis: analysis,
+        researchResult: research,
       },
     });
 

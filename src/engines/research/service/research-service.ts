@@ -1,15 +1,15 @@
 import { ResearchResult } from "../models/research-result";
 import { ResearchProvider, ResearchInput } from "../provider/research-provider";
-import { ManualProvider } from "../provider/manual-provider";
+import { WebFetchProvider } from "../provider/web-fetch-provider";
 
 export class ResearchService {
   private providers: Map<string, ResearchProvider> = new Map();
   private fallbackProvider: ResearchProvider;
 
   constructor() {
-    const manual = new ManualProvider();
-    this.fallbackProvider = manual;
-    this.register(manual);
+    const webFetch = new WebFetchProvider();
+    this.fallbackProvider = webFetch;
+    this.register(webFetch);
   }
 
   register(provider: ResearchProvider): void {

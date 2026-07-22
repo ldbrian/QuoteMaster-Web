@@ -16,7 +16,7 @@ import {
   Target,
   ThumbsUp,
   ThumbsDown,
-  MessageSquare, Sparkles, GitBranch, CheckCircle, AlertTriangle, Clock, HelpCircle,
+  MessageSquare, Sparkles, GitBranch, CheckCircle, AlertTriangle, Clock, HelpCircle, Globe, Database, FileSearch,
 } from "lucide-react";
 
 type Opportunity = {
@@ -40,6 +40,18 @@ type Opportunity = {
   decidedAt: string | null;
   status: string;
   createdAt: string;
+  researchResult: {
+    companyName: string;
+    website: string;
+    description: string;
+    additionalNotes: string;
+    products: string;
+    markets: string;
+    businessModel: string;
+    knownFacts: string[];
+    unknownFacts: string[];
+    sources: string[];
+  } | null;
 };
 
 const FIT_LABELS: Record<string, { label: string; color: string; bg: string }> = {
@@ -277,6 +289,57 @@ export default function OpportunityDetailPage({
           <div className="mb-6">
             <ConfidenceBar score={opportunity.confidenceScore} reason={opportunity.confidenceReason} />
           </div>
+        )}
+
+        {/* Research Summary */}
+        {opportunity.researchResult && (
+          <details className="mb-6 group">
+            <summary className="flex items-center gap-2 cursor-pointer text-sm text-gray-500 hover:text-gray-700 select-none py-2">
+              <FileSearch className="w-4 h-4" />
+              <span>研究摘要</span>
+              <span className="text-xs text-gray-400 ml-auto group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="mt-3 space-y-3">
+              {opportunity.researchResult.products && (
+                <div className="p-3 bg-white border border-gray-200 rounded-lg">
+                  <div className="text-xs text-gray-400 mb-1">主营产品</div>
+                  <div className="text-sm text-gray-800">{opportunity.researchResult.products}</div>
+                </div>
+              )}
+              {opportunity.researchResult.markets && (
+                <div className="p-3 bg-white border border-gray-200 rounded-lg">
+                  <div className="text-xs text-gray-400 mb-1">目标市场</div>
+                  <div className="text-sm text-gray-800">{opportunity.researchResult.markets}</div>
+                </div>
+              )}
+              {opportunity.researchResult.businessModel && (
+                <div className="p-3 bg-white border border-gray-200 rounded-lg">
+                  <div className="text-xs text-gray-400 mb-1">商业模式</div>
+                  <div className="text-sm text-gray-800">{opportunity.researchResult.businessModel}</div>
+                </div>
+              )}
+              {opportunity.researchResult.knownFacts.length > 0 && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="text-xs text-green-600 font-medium mb-1.5">已知信息 ({opportunity.researchResult.sources.join(", ")})</div>
+                  <ul className="text-sm text-green-800 space-y-0.5">
+                    {opportunity.researchResult.knownFacts.map((f, i) => (
+                      <li key={i} className="flex items-start gap-1.5"><CheckCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-green-500" /><span>{f}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {opportunity.researchResult.unknownFacts.length > 0 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="text-xs text-amber-600 font-medium mb-1.5">缺失信息</div>
+                  <ul className="text-sm text-amber-800 space-y-0.5">
+                    {opportunity.researchResult.unknownFacts.map((f, i) => (
+                      <li key={i} className="flex items-start gap-1.5"><HelpCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" /><span>{f}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </details>
         )}
 
         <div className="space-y-4">

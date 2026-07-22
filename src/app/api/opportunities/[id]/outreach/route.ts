@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "@/src/utils/auth/server";
 import { prisma } from "@/src/utils/prisma";
-import { generateOutreach } from "@/src/utils/ai/outreach";
-import { researchService } from "@/src/research/service/research-service";
+import { generateOutreach } from "@/src/engines/action/outreach";
+import { researchService } from "@/src/engines/research/service/research-service";
 
 export async function GET(
   req: Request,

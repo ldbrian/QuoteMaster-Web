@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "@/src/utils/auth/server";
 import { prisma } from "@/src/utils/prisma";
-import { analyzeCommunication } from "@/src/utils/ai/thread";
+import { analyzeCommunication } from "@/src/engines/action/thread";
 
 export async function POST(
   req: Request,

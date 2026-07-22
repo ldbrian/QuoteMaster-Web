@@ -40,6 +40,7 @@ model Opportunity {
   confidenceReason   String?
   decisionAdvice     String?
   rawAnalysis    Json?
+  researchResult Json?
   status         String   @default("analyzed")
   decisionStatus     String?  @default("PENDING") // PENDING | DEVELOP | REJECT | CONTACTED
   decisionReason     String?
