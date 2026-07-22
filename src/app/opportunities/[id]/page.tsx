@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/src/components/AppHeader";
 import { useAuth } from "@/src/hooks/useAuth";
-import { supabase } from "@/src/utils/supabase/client";
 import {
   Loader2,
   ArrowLeft,
@@ -136,7 +135,7 @@ export default function OpportunityDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -154,9 +153,8 @@ export default function OpportunityDetailPage({
 
     (async () => {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
         const res = await fetch(`/api/opportunities/${id}`, {
-          headers: { Authorization: `Bearer ${sessionData.session?.access_token}` },
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) { router.replace("/opportunities"); return; }
         const data = await res.json();
@@ -169,9 +167,8 @@ export default function OpportunityDetailPage({
   }, [authLoading, user, id, router]);
 
   const submitFeedback = async (field: string, value: boolean | number) => {
-    if (!opportunity) return;
+    if (!opportunity || !token) return;
     setFeedbackSaving(true);
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
     await fetch("/api/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -182,9 +179,8 @@ export default function OpportunityDetailPage({
   };
 
   const submitAccuracy = async (rating: number) => {
-    if (!opportunity) return;
+    if (!opportunity || !token) return;
     setFeedbackSaving(true);
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
     await fetch("/api/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -195,9 +191,8 @@ export default function OpportunityDetailPage({
   };
 
   const submitDecision = async () => {
-    if (!opportunity || !selectedDecision) return;
+    if (!opportunity || !selectedDecision || !token) return;
     setSavingDecision(true);
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
     const res = await fetch(`/api/opportunities/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -456,7 +451,6 @@ export default function OpportunityDetailPage({
           </Link>
           <Link href={`/threads`} onClick={async (e) => {
             e.preventDefault();
-            const token = (await supabase.auth.getSession()).data.session?.access_token;
             const res = await fetch("/api/threads", {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

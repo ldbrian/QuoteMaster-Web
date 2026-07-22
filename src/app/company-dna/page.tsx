@@ -4,8 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import AppHeader from "@/src/components/AppHeader";
 import { useAuth } from "@/src/hooks/useAuth";
-import { supabase } from "@/src/utils/supabase/client";
-import { Loader2, CheckCircle, Edit3, Send, ArrowRight } from "lucide-react";
+import { Loader2, CheckCircle, Edit3, Send, ArrowRight, AlertCircle } from "lucide-react";
 
 type Profile = {
   id: string;
@@ -28,7 +27,7 @@ const LABELS: Record<string, string> = {
 };
 
 export default function CompanyDnaPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -36,12 +35,11 @@ export default function CompanyDnaPage() {
   const [editMode, setEditMode] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<string>("");
   const [aiReason, setAiReason] = useState<string>("");
+  const [saveStatus, setSaveStatus] = useState<"success" | "error" | "">("");
 
   const fetchProfile = useCallback(async () => {
-    if (!user) return;
+    if (!token) return;
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
       const res = await fetch("/api/company-profile", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -86,11 +84,10 @@ export default function CompanyDnaPage() {
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!token) return;
     setSaving(true);
+    setSaveStatus("");
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
       const res = await fetch("/api/company-profile", {
         method: "PUT",
         headers: {
@@ -104,8 +101,11 @@ export default function CompanyDnaPage() {
       setEditMode(false);
       setAiSuggestion("");
       setAiReason("");
+      setSaveStatus("success");
+      setTimeout(() => setSaveStatus(""), 3000);
     } catch {
-      // Silently fail
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus(""), 5000);
     }
     setSaving(false);
   };
@@ -218,6 +218,17 @@ export default function CompanyDnaPage() {
           </button>
         )}
       </div>
+
+      {saveStatus === "success" && (
+        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+          <CheckCircle className="w-4 h-4" /> 保存成功
+        </div>
+      )}
+      {saveStatus === "error" && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" /> 保存失败，请重试
+        </div>
+      )}
 
       {aiSuggestion && (
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">

@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import AppHeader from "@/src/components/AppHeader";
 import { useAuth } from "@/src/hooks/useAuth";
-import { supabase } from "@/src/utils/supabase/client";
 import { Loader2, Plus, Target, Star, ExternalLink } from "lucide-react";
 
 type OpportunityItem = {
@@ -30,17 +29,15 @@ const FIT_LABELS: Record<string, string> = {
 };
 
 export default function OpportunitiesPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const [opportunities, setOpportunities] = useState<OpportunityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const fetchOpportunities = useCallback(async () => {
-    if (!user) return;
+    if (!token) return;
     setError("");
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
       const res = await fetch("/api/opportunities", {
         headers: { Authorization: `Bearer ${token}` },
       });

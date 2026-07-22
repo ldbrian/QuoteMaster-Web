@@ -3,7 +3,6 @@
 import { useEffect, useState, use } from "react";
 import AppHeader from "@/src/components/AppHeader";
 import { useAuth } from "@/src/hooks/useAuth";
-import { supabase } from "@/src/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import {
   Loader2,
@@ -41,7 +40,7 @@ export default function OutreachPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [drafts, setDrafts] = useState<EmailDraft[]>([]);
@@ -82,11 +81,7 @@ export default function OutreachPage({
     if (!user) { router.replace("/login"); return; }
 
     (async () => {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData.session?.access_token) fetchData(sessionData.session.access_token);
-      } catch {}
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (token) fetchData(token);
     })();
   }, [authLoading, user, id, router]);
 
@@ -94,12 +89,11 @@ export default function OutreachPage({
     if (!user) return;
     setGenerating(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
       const res = await fetch(`/api/opportunities/${id}/outreach`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${sessionData.session?.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           tone: tone !== "professional" ? tone : undefined,

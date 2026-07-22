@@ -9,23 +9,22 @@ import AppHeader from "@/src/components/AppHeader";
 import { Loader2, Target, Mail, MessageSquare, Building2, ArrowRight, CheckCircle } from "lucide-react";
 
 export default function HomePage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
   const [profileCompleted, setProfileCompleted] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
+    if (!user || !token) {
       router.replace("/login");
       return;
     }
 
     (async () => {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
         const res = await fetch("/api/company-profile", {
-          headers: { Authorization: `Bearer ${sessionData.session?.access_token}` },
+          headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
         setProfileCompleted(data.profile?.isCompleted ?? false);

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/src/hooks/useAuth";
-import { supabase } from "@/src/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "@/src/components/AppHeader";
@@ -53,7 +52,7 @@ const STATUS_TABS = [
 ];
 
 export default function ThreadsPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
   const [threads, setThreads] = useState<ThreadItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,11 +66,9 @@ export default function ThreadsPage() {
   const [manualCreating, setManualCreating] = useState(false);
 
   const fetchThreads = useCallback(async () => {
-    if (!user) return;
+    if (!token) return;
     setError("");
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
       const res = await fetch(`/api/threads?status=${statusFilter}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -90,7 +87,7 @@ export default function ThreadsPage() {
       setError("加载失败，请检查网络后重试");
     }
     setLoading(false);
-  }, [user, statusFilter]);
+  }, [token, statusFilter]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -101,8 +98,6 @@ export default function ThreadsPage() {
   const handleConvert = async (opp: RecentOpp) => {
     setConverting(opp.id);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
       const res = await fetch("/api/threads", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -123,11 +118,9 @@ export default function ThreadsPage() {
   };
 
   const handleManualCreate = async () => {
-    if (!manualTitle.trim()) return;
+    if (!manualTitle.trim() || !token) return;
     setManualCreating(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
       const res = await fetch("/api/threads", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/src/hooks/useAuth";
-import { supabase } from "@/src/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/src/components/AppHeader";
 import {
@@ -40,7 +39,7 @@ const DECISION_ICONS: Record<string, any> = {
 };
 
 export default function InsightsPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
   const [insights, setInsights] = useState<Insights | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,9 +50,8 @@ export default function InsightsPage() {
 
     (async () => {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
         const res = await fetch("/api/insights", {
-          headers: { Authorization: `Bearer ${sessionData.session?.access_token}` },
+          headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
         setInsights(data);

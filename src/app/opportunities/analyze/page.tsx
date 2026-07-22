@@ -3,12 +3,11 @@
 import { useState, useEffect } from "react";
 import AppHeader from "@/src/components/AppHeader";
 import { useAuth } from "@/src/hooks/useAuth";
-import { supabase } from "@/src/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { Loader2, Globe, Search, FileText, AlertCircle } from "lucide-react";
 
 export default function AnalyzePage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
   const [companyName, setCompanyName] = useState("");
   const [website, setWebsite] = useState("");
@@ -33,12 +32,11 @@ export default function AnalyzePage() {
     setAnalyzing(true);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
       const res = await fetch("/api/opportunities", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${sessionData.session?.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           companyName: companyName.trim(),

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, use } from "react";
 import { useAuth } from "@/src/hooks/useAuth";
-import { supabase } from "@/src/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "@/src/components/AppHeader";
@@ -61,7 +60,7 @@ export default function ThreadDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
   const [thread, setThread] = useState<Thread | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,11 +71,9 @@ export default function ThreadDetailPage({
   const [capturing, setCapturing] = useState(false);
 
   const fetchThread = async () => {
-    if (!user) return;
+    if (!token) return;
     setError("");
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
       const res = await fetch(`/api/threads/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -89,18 +86,10 @@ export default function ThreadDetailPage({
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) { router.replace("/login"); return; }
-    fetchThread();
-  }, [authLoading, user, id]);
-
   const handleCapture = async () => {
-    if (!captureText.trim() || !thread) return;
+    if (!captureText.trim() || !thread || !token) return;
     setCapturing(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
       const res = await fetch(`/api/threads/${id}/communicate`, {
         method: "POST",
         headers: {
@@ -127,10 +116,8 @@ export default function ThreadDetailPage({
   };
 
   const updateStatus = async (status: string) => {
-    if (!thread) return;
+    if (!thread || !token) return;
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
       const res = await fetch(`/api/threads/${id}`, {
         method: "PATCH",
         headers: {
