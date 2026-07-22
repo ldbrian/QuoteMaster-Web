@@ -34,18 +34,13 @@ export async function GET() {
   }
 
   try {
-    await prisma.businessThread.findMany({
+    await prisma.companyProfile.findMany({
       take: 1,
-      select: {
-        id: true,
-        owner_user_id: true,
-        context: true,
-        identity_cluster_key: true,
-      },
+      select: { id: true, userId: true, companyName: true },
     });
-    checks.business_thread_schema = { ok: true };
+    checks.schema = { ok: true };
   } catch (error) {
-    checks.business_thread_schema = { ok: false, detail: serializeError(error) };
+    checks.schema = { ok: false, detail: serializeError(error) };
   }
 
   const ok = Object.values(checks).every((check) => check.ok);

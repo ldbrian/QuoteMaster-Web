@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "QuoteMaster AI | 外贸极速核价雷达", // 🌟 浏览器标签栏显示的名字
-  description: "30秒看图扒底价，一键生成防底牌走光的专业外贸报价单。", // 🌟 分享给别人时显示的小字介绍
+  title: "QuoteMaster | AI 外贸客户开发助手",
+  description: "输入客户信息，AI 分析客户价值，生成开发策略和开发信。",
 };
 
 export default function RootLayout({
@@ -23,9 +23,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="zh-CN">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-900`}
       >
         {children}
       </body>

@@ -1,24 +1,23 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { supabase } from '@/src/utils/supabase/client';
-import { useRouter } from 'next/navigation';
-import { Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
+import React, { useState } from "react";
+import { supabase } from "@/src/utils/supabase/client";
+import { useRouter } from "next/navigation";
+import { Mail, Lock, Loader2, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
 
-  const syncQuoteMasterExtensionAuth = (session: any) => {
+  const syncExtensionAuth = (session: any) => {
     if (!session?.access_token || !session?.user?.id) return;
-
     window.postMessage(
       {
-        source: 'QUOTEMASTER_WEB_AUTH',
-        type: 'QUOTEMASTER_SET_AUTH',
+        source: "QUOTEMASTER_WEB_AUTH",
+        type: "QUOTEMASTER_SET_AUTH",
         payload: {
           access_token: session.access_token,
           user_id: session.user.id,
@@ -35,18 +34,32 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        alert('🎉 注册成功！请查收您的邮箱进行验证，或直接尝试登录。');
+        const res = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        alert("🎉 注册成功！请查收邮箱进行验证。");
         setIsSignUp(false);
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        syncQuoteMasterExtensionAuth(data.session);
-        router.push('/business-threads'); // 登录成功，跳转回 Dashboard
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        if (data.session) {
+          await supabase.auth.setSession(data.session);
+          syncExtensionAuth(data.session);
+        }
+        router.push("/home");
       }
     } catch (error: any) {
-      alert(error.message || '登录/注册失败，请检查账号密码后重试');
+      alert(error.message || "登录失败，请检查账号密码");
     } finally {
       setLoading(false);
     }
@@ -54,73 +67,75 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/business-threads`,
-      }
+        redirectTo: `${window.location.origin}/home`,
+      },
     });
-    if (error) alert('Google 登录失败: ' + error.message);
+    if (error) alert("Google 登录失败: " + error.message);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 selection:bg-blue-100">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 border border-slate-100">
-        
-        {/* Logo & 标题区 */}
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-lg p-8 border border-slate-100">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-blue-200 mx-auto mb-4">
+          <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg mx-auto mb-4">
             Q
           </div>
           <h2 className="text-2xl font-bold text-slate-900">
-            {isSignUp ? '创建 QuoteMaster 账号' : '欢迎登录 QuoteMaster'}
+            {isSignUp ? "创建 QuoteMaster 账号" : "欢迎登录 QuoteMaster"}
           </h2>
-          <p className="text-slate-500 text-sm mt-2">
-            AI 驱动的外贸智能核价与跟单系统
-          </p>
+          <p className="text-slate-500 text-sm mt-2">AI 外贸客户开发助手</p>
         </div>
 
-        {/* 邮箱密码表单 */}
         <form onSubmit={handleAuth} className="space-y-4">
-          <div>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="email" required placeholder="请输入企业或常用邮箱"
-                value={email} onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-              />
-            </div>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="email"
+              required
+              placeholder="请输入邮箱"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
           </div>
-          <div>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="password" required placeholder="请输入密码 (至少 6 位)"
-                value={password} onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-              />
-            </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="password"
+              required
+              placeholder="请输入密码（至少 6 位）"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
           </div>
 
-          <button 
-            type="submit" disabled={loading}
-            className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70"
           >
-            {loading ? <Loader2 className="animate-spin" size={18} /> : (isSignUp ? '立即注册' : '登录系统')}
+            {loading ? (
+              <Loader2 className="animate-spin" size={18} />
+            ) : (
+              isSignUp ? "立即注册" : "登录"
+            )}
             {!loading && <ArrowRight size={18} />}
           </button>
         </form>
 
         <div className="my-6 flex items-center gap-3">
           <div className="flex-1 h-px bg-slate-100"></div>
-          <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">或使用第三方账号</span>
+          <span className="text-xs font-medium text-slate-400">或使用第三方账号</span>
           <div className="flex-1 h-px bg-slate-100"></div>
         </div>
 
-        {/* Google 登录按钮 */}
-        <button 
-          type="button" onClick={handleGoogleLogin}
-          className="w-full bg-white border border-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          className="w-full bg-white border border-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-50 flex items-center justify-center gap-2"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -132,12 +147,14 @@ export default function LoginPage() {
         </button>
 
         <div className="mt-8 text-center text-sm text-slate-500">
-          {isSignUp ? "已经有账号了？" : "还没有账号？"}{' '}
-          <button onClick={() => setIsSignUp(!isSignUp)} className="text-blue-600 font-bold hover:underline">
-            {isSignUp ? '返回登录' : '立即免费注册'}
+          {isSignUp ? "已经有账号了？" : "还没有账号？"}{" "}
+          <button
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="text-blue-600 font-bold hover:underline"
+          >
+            {isSignUp ? "返回登录" : "立即免费注册"}
           </button>
         </div>
-
       </div>
     </div>
   );
