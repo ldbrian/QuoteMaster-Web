@@ -1,6 +1,9 @@
 import { DiscoveryProvider } from "../provider/discovery-provider";
 import { DiscoveryInput, DiscoveryResult } from "../models/discovery-types";
 import { ManualDiscoveryProvider } from "../provider/manual-provider";
+import { BraveSearchProvider } from "../provider/brave-search-provider";
+import { MultiQueryProvider } from "../provider/multi-query-provider";
+import { DuckDuckGoProvider } from "../provider/duckduckgo-provider";
 
 export class DiscoveryService {
   private providers: Map<string, DiscoveryProvider> = new Map();
@@ -10,6 +13,18 @@ export class DiscoveryService {
     const manual = new ManualDiscoveryProvider();
     this.fallbackProvider = manual;
     this.register(manual);
+    try {
+      this.register(new BraveSearchProvider());
+      this.register(new MultiQueryProvider());
+    } catch {
+      // Brave provider registration skipped (env vars not configured)
+    }
+
+    try {
+      this.register(new DuckDuckGoProvider());
+    } catch {
+      // DuckDuckGo provider registration skipped
+    }
   }
 
   register(provider: DiscoveryProvider): void {

@@ -5,8 +5,8 @@ import { scoreCandidates } from "@/src/engines/discovery/utils/icp-matcher";
 
 async function handleError(e: unknown) {
   const message = e instanceof Error ? e.message : String(e);
-  console.error("Discover API error:", message, e);
-  return NextResponse.json({ error: "服务器内部错误" }, { status: 500 });
+  console.error("Discover search API error:", message, e);
+  return NextResponse.json({ error: "搜索失败，请检查 Brave Search API 配置" }, { status: 500 });
 }
 
 export async function POST(req: Request) {
@@ -17,25 +17,29 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { rawList, icpKeywords } = body;
+    const { keywords } = body;
 
-    if (!rawList?.trim()) {
-      return NextResponse.json({ error: "请输入客户列表" }, { status: 400 });
+    if (!keywords?.length) {
+      return NextResponse.json({ error: "请输入搜索关键词" }, { status: 400 });
     }
 
-    const discoveryResult = await discoveryService.discover({ rawList });
+    const providerName = discoveryService.getProvider("deep-search") ? "deep-search" : "brave-search";
+    const result = await discoveryService.discover(
+      { keywords, icp: { industries: keywords } },
+      providerName
+    );
 
-    const base = discoveryResult.candidates.map((c) => ({
-      companyName: c.companyName,
-      website: c.website,
-    }));
-
-    const candidates = icpKeywords?.length > 0
-      ? scoreCandidates({ keywords: icpKeywords }, base)
-      : base.map((c) => ({ ...c, icpScore: 0, matchReasons: [] as string[] }));
+    const candidates = scoreCandidates(
+      { keywords },
+      result.candidates.map((c) => ({
+        companyName: c.companyName,
+        website: c.website,
+      }))
+    );
 
     return NextResponse.json({
       total: candidates.length,
+      provider: providerName,
       candidates,
     });
   } catch (e) {

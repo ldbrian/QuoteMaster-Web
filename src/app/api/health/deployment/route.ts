@@ -24,6 +24,7 @@ export async function GET() {
     NEXT_PUBLIC_SUPABASE_URL: envCheck("NEXT_PUBLIC_SUPABASE_URL"),
     NEXT_PUBLIC_SUPABASE_ANON_KEY: envCheck("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
     DEEPSEEK_API_KEY: envCheck("DEEPSEEK_API_KEY"),
+    BRAVE_API_KEY: envCheck("BRAVE_API_KEY"),
   };
 
   try {
